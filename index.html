@@ -1,0 +1,2823 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Command Center</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#6b4478">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Command Center">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+  :root{
+    --navy:#6b4478;
+    --navy-soft:#7d5389;
+    --slate:#707480;
+    --slate-light:#9a9dab;
+    --cream:#fbf9fb;
+    --card:#ffffff;
+    --lavender:#f3ecf4;
+    --lavender-mid:#eadfef;
+    --border:#e4dfe8;
+    --purple:#9e75b1;
+    --purple-bg:#f1e6f5;
+    --teal:#6fa8b3;
+    --teal-bg:#e4f1f3;
+    --gold:#cf9f3f;
+    --gold-bg:#f9edd3;
+    --today:#6b4478;
+    --week:#f3ecf4;
+    --danger:#b5636b;
+    --shadow: 0 1px 3px rgba(94,63,102,0.10), 0 1px 2px rgba(94,63,102,0.07);
+    --shadow-lg: 0 8px 24px rgba(94,63,102,0.12);
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--navy);}
+  h1,h2,h3,.serif{font-family:'Lora',serif;}
+  a{color:inherit;}
+  button{font-family:inherit;cursor:pointer;}
+  input,select,textarea{font-family:inherit;}
+
+  /* ---- Layout ---- */
+  .app{display:flex;min-height:100vh;}
+  .nav{
+    width:220px;flex-shrink:0;background:var(--navy);color:#fff;
+    display:flex;flex-direction:column;padding:28px 0;
+  }
+  .nav-brand{
+    font-family:'Lora',serif;font-size:20px;font-weight:600;letter-spacing:0.3px;
+    padding:0 24px 24px 24px;border-bottom:1px solid rgba(255,255,255,0.12);margin-bottom:12px;
+  }
+  .nav-brand span{display:block;font-family:'DM Sans',sans-serif;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--slate-light);margin-top:4px;font-weight:500;}
+  .nav-item{
+    padding:12px 24px;font-size:14.5px;color:rgba(255,255,255,0.72);cursor:pointer;
+    border-left:3px solid transparent;transition:all .15s ease;font-weight:500;
+  }
+  .nav-item:hover{background:rgba(255,255,255,0.06);color:#fff;}
+  .nav-item.active{background:rgba(255,255,255,0.09);color:#fff;border-left-color:var(--gold);}
+  .nav-foot{margin-top:auto;padding:16px 24px 0 24px;font-size:11px;color:var(--slate-light);border-top:1px solid rgba(255,255,255,0.1);padding-top:16px;line-height:1.5;}
+  .backup-buttons{display:flex;flex-direction:column;gap:6px;margin-top:10px;}
+  .nav-backup-btn{
+    background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.85);border:1px solid rgba(255,255,255,0.14);
+    border-radius:7px;padding:7px 10px;font-size:11.5px;text-align:left;font-weight:500;
+  }
+  .nav-backup-btn:hover{background:rgba(255,255,255,0.15);color:#fff;}
+  .toast-notice{
+    position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);
+    background:var(--navy);color:#fff;padding:12px 22px;border-radius:10px;font-size:13.5px;
+    box-shadow:var(--shadow-lg);opacity:0;pointer-events:none;transition:all .25s ease;z-index:1100;max-width:80vw;text-align:center;
+  }
+  .toast-notice.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  .main{flex:1;padding:32px 40px 80px 40px;max-width:1400px;}
+  .page{display:none;}
+  .page.active{display:block;}
+  .page-head{margin-bottom:24px;}
+  .page-head h1{font-size:26px;margin:0 0 4px 0;font-weight:600;}
+  .page-head p{margin:0;color:var(--slate);font-size:14px;}
+
+  /* ---- Cards ---- */
+  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:22px;box-shadow:var(--shadow);}
+  .card h2{font-size:16px;margin:0 0 14px 0;font-weight:600;display:flex;align-items:center;justify-content:space-between;}
+  .card h2 .sub{font-size:11.5px;font-weight:500;color:var(--slate);text-transform:uppercase;letter-spacing:0.5px;}
+
+  /* ---- Dashboard grid ---- */
+  .dash-grid{display:grid;grid-template-columns:1.15fr 1fr;gap:20px;}
+  .dash-col{display:flex;flex-direction:column;gap:20px;}
+  .span2{grid-column:1 / -1;}
+
+  /* Scripture card */
+  .scripture-card{background:var(--navy);color:#fff;border:none;}
+  .scripture-card h2{color:rgba(255,255,255,0.75);}
+  .scripture-verse{font-family:'Lora',serif;font-style:italic;font-size:18px;line-height:1.55;margin:6px 0 4px 0;}
+  .scripture-ref{font-size:12.5px;color:var(--gold);letter-spacing:0.4px;margin-bottom:16px;font-weight:600;}
+  .affirmation-label{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,0.5);margin-bottom:4px;}
+  .affirmation-text{font-size:15px;line-height:1.5;color:#fff;}
+
+  /* Calendar */
+  .cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+  .cal-nav button{background:none;border:1px solid var(--border);border-radius:8px;width:30px;height:30px;font-size:15px;color:var(--navy);}
+  .cal-nav button:hover{background:var(--lavender);}
+  .cal-month{font-weight:600;font-size:15px;font-family:'Lora',serif;}
+  table.cal{width:100%;border-collapse:collapse;table-layout:fixed;}
+  table.cal th{font-size:10.5px;color:var(--slate);text-transform:uppercase;letter-spacing:0.5px;padding:6px 0;font-weight:600;}
+  table.cal td{text-align:center;padding:0;height:38px;position:relative;}
+  .cal-day{
+    width:32px;height:32px;line-height:32px;border-radius:50%;margin:0 auto;cursor:pointer;
+    font-size:13.5px;color:var(--navy);position:relative;z-index:2;
+  }
+  .cal-day:hover{background:var(--lavender-mid);}
+  tr.cur-week td{background:var(--week);}
+  tr.cur-week td:first-child .cal-day{}
+  .cal-day.today{background:var(--today);color:#fff;font-weight:700;}
+  .cal-day.selected:not(.today){border:2px solid var(--navy);}
+  .cal-day.other-month{color:var(--slate-light);}
+  .cal-day.has-event::after{content:'';position:absolute;bottom:2px;left:50%;transform:translateX(-50%);width:4px;height:4px;border-radius:50%;background:var(--gold);}
+
+  /* Tags */
+  .tag{display:inline-block;padding:3px 9px;border-radius:20px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;}
+  .tag-Home{background:var(--teal-bg);color:var(--teal);}
+  .tag-TNF{background:var(--purple-bg);color:var(--purple);}
+  .tag-SSBB{background:var(--gold-bg);color:var(--gold);}
+  .tag-SSBB_TNF{background:linear-gradient(90deg, var(--gold-bg) 0%, var(--purple-bg) 100%);color:var(--navy);}
+
+  /* Task list */
+  .task-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);}
+  .task-row:last-child{border-bottom:none;}
+  .task-row input[type=checkbox]{width:17px;height:17px;accent-color:var(--navy);cursor:pointer;flex-shrink:0;}
+  .task-row .task-text{flex:1;font-size:14px;}
+  .task-row.done .task-text{text-decoration:line-through;color:var(--slate-light);}
+  .empty-slot{padding:9px 0;font-size:13px;color:var(--slate-light);font-style:italic;}
+  .drag-handle{width:34px;padding:2px !important;text-align:center;cursor:grab;color:var(--slate-light);font-size:15px;user-select:none;}
+  .drag-handle:active{cursor:grabbing;}
+  tr.sortable-ghost{opacity:0.35;}
+  tr.sortable-chosen td{background:var(--lavender) !important;}
+  .dt-add-row{display:flex;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);}
+  .dt-add-row input[type=text]{flex:1;border:1px solid var(--border);border-radius:7px;padding:6px 9px;font-size:12.5px;min-width:0;}
+  .dt-add-row .add-btn{border:1px solid var(--border);border-radius:7px;background:#fff;font-size:15px;line-height:1;padding:0 10px;color:var(--navy);}
+  .dt-add-row .add-btn:hover{background:var(--lavender);}
+  .dt-item .icon-btn.small-x{padding:0 4px;font-size:11px;margin-left:auto;flex-shrink:0;}
+  .quick-add-row{display:flex;gap:6px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);flex-wrap:wrap;}
+  .quick-add-row input[type=text]{flex:1;min-width:120px;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;}
+  .quick-add-row select{border:1px solid var(--border);border-radius:8px;padding:8px 6px;font-size:12.5px;background:#fff;}
+  .quick-add-row .btn{padding:8px 14px;}
+
+  /* Daily task 3-col */
+  .daily-tasks-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
+  .daily-tasks-grid .dt-col h3{font-size:12px;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 8px 0;font-weight:700;}
+  .dt-col.Home h3{color:var(--teal);}
+  .dt-col.TNF h3{color:var(--purple);}
+  .dt-col.SSBB h3{color:var(--gold);}
+  .dt-item{display:flex;gap:7px;align-items:flex-start;font-size:13px;padding:5px 0;}
+  .dt-item input{margin-top:2px;accent-color:var(--navy);}
+  .dt-item.done span{text-decoration:line-through;color:var(--slate-light);}
+  .dt-empty{font-size:12.5px;color:var(--slate-light);font-style:italic;}
+
+  /* Events list */
+  .event-row{display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);font-size:13.5px;}
+  .event-row:last-child{border-bottom:none;}
+  .event-date{width:78px;flex-shrink:0;font-weight:700;color:var(--navy);font-size:12.5px;line-height:1.4;}
+  .event-title{flex:1;}
+  .event-badge{font-size:11.5px;color:var(--navy);font-weight:700;}
+
+  /* Meals */
+  .meal-block{display:flex;gap:14px;}
+  .gratitude-list{display:flex;flex-direction:column;gap:8px;}
+  .gratitude-row{display:flex;align-items:center;gap:8px;}
+  .gratitude-num{width:18px;height:18px;border-radius:50%;background:var(--lavender);color:var(--purple);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .gratitude-row input{flex:1;border:none;border-bottom:1px solid var(--border);padding:4px 2px;font-size:13.5px;color:var(--navy);background:transparent;}
+  .gratitude-row input:focus{outline:none;border-bottom-color:var(--purple);}
+  .meal-item{flex:1;background:var(--lavender);border-radius:10px;padding:12px 14px;}
+  .meal-item .meal-label{font-size:10.5px;text-transform:uppercase;letter-spacing:0.6px;color:var(--purple);font-weight:700;margin-bottom:4px;}
+  .meal-item .meal-value{font-size:14px;color:var(--navy);}
+  .meal-item .meal-empty{font-size:13px;color:var(--slate-light);font-style:italic;}
+
+  /* Monthly/Yearly */
+  .my-list{display:flex;flex-direction:column;gap:2px;}
+  .my-item{font-size:13.5px;display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);}
+  .my-item:last-child{border-bottom:none;}
+  .my-item input[type=checkbox]{width:16px;height:16px;accent-color:var(--navy);cursor:pointer;flex-shrink:0;}
+  .my-item.done .my-task-text{text-decoration:line-through;color:var(--slate-light);}
+
+  /* ---- Spreadsheet-style tables (dump pages) ---- */
+  .sheet-toolbar{display:flex;gap:10px;margin-bottom:14px;align-items:center;flex-wrap:wrap;}
+  .btn{background:var(--navy);color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:13.5px;font-weight:600;}
+  .btn:hover{background:var(--navy-soft);}
+  .btn.secondary{background:#fff;color:var(--navy);border:1px solid var(--border);}
+  .btn.secondary:hover{background:var(--lavender);}
+  .btn.danger{background:#fff;color:var(--danger);border:1px solid #eecdd0;}
+  .btn.danger:hover{background:#fbeced;}
+  .btn.small{padding:5px 10px;font-size:12px;border-radius:6px;}
+
+  table.sheet{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden;border:1px solid var(--border);}
+  table.sheet th{background:var(--navy);color:#fff;font-size:11.5px;text-transform:uppercase;letter-spacing:0.5px;text-align:left;padding:10px 12px;font-weight:600;}
+  table.sheet td{padding:0;border-bottom:1px solid var(--border);border-right:1px solid var(--border);vertical-align:middle;}
+  table.sheet td:last-child{border-right:none;}
+  table.sheet tr:last-child td{border-bottom:none;}
+  table.sheet tr:nth-child(even){background:#fdfbfd;}
+  table.sheet input[type=text],table.sheet input[type=date],table.sheet input[type=number],table.sheet select,table.sheet textarea{
+    width:100%;border:none;background:transparent;padding:10px 12px;font-size:13.5px;color:var(--navy);
+  }
+  table.sheet input:focus,table.sheet select:focus,table.sheet textarea:focus{outline:2px solid var(--lavender-mid);outline-offset:-2px;background:#fdfaff;}
+  table.sheet .chk-cell{text-align:center;width:70px;}
+  table.sheet .del-cell{width:44px;text-align:center;}
+  table.sheet .row-done input[type=text]{text-decoration:line-through;color:var(--slate-light);}
+  .icon-btn{background:none;border:none;color:var(--slate);font-size:15px;padding:6px;border-radius:6px;}
+  .icon-btn:hover{background:var(--lavender);color:var(--danger);}
+
+  .section-divider{display:flex;align-items:center;gap:10px;margin:26px 0 14px 0;}
+  .section-divider span{font-size:12px;text-transform:uppercase;letter-spacing:0.8px;color:var(--slate);font-weight:700;white-space:nowrap;}
+  .section-divider .line{flex:1;height:1px;background:var(--border);}
+
+  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:24px;}
+
+  /* Big Meal Planner - lives as a cell inside the Favorite Meals grid */
+  .bigmeal-cell{background:#fff;border:2px solid var(--purple);border-radius:10px;padding:12px;max-height:380px;overflow-y:auto;align-self:start;}
+  .bigmeal-cell h4{margin:0 0 6px 0;font-size:12.5px;text-transform:uppercase;letter-spacing:0.4px;color:var(--purple);font-weight:700;}
+  .bigmeal-note{font-size:11px;color:var(--slate);line-height:1.4;margin:0 0 8px 0;}
+  .bigmeal-date-label{font-size:10.5px;text-transform:uppercase;letter-spacing:0.5px;color:var(--slate);font-weight:700;display:block;margin-bottom:3px;}
+  #bigmeal-date{width:100%;border:1px solid var(--border);border-radius:7px;padding:6px 8px;font-size:12.5px;margin-bottom:10px;}
+  .bigmeal-slot{margin-bottom:12px;}
+  .bigmeal-slot h4{margin:0 0 5px 0;font-size:10.5px;text-transform:uppercase;letter-spacing:0.5px;color:var(--purple);font-weight:700;}
+  .bigmeal-items{min-height:24px;border:1.5px dashed var(--border);border-radius:7px;padding:5px;margin-bottom:5px;}
+  .bigmeal-items.drag-over{border-color:var(--purple);background:var(--purple-bg);}
+  .bigmeal-items .bigmeal-empty{font-size:11px;color:var(--slate-light);font-style:italic;padding:3px;}
+  .bigmeal-item-row{display:flex;align-items:center;gap:5px;font-size:12px;padding:3px 2px;border-bottom:1px solid var(--border);}
+  .bigmeal-item-row:last-child{border-bottom:none;}
+  .bigmeal-item-row span{flex:1;color:var(--navy);}
+  .bigmeal-add-row{display:flex;gap:5px;}
+  .bigmeal-add-row input{flex:1;border:1px solid var(--border);border-radius:6px;padding:5px 7px;font-size:11.5px;min-width:0;}
+
+  .meal-cal{width:100%;border-collapse:collapse;table-layout:fixed;}
+  .meal-cal th{font-size:10.5px;color:var(--slate);text-transform:uppercase;padding:6px 0;text-align:center;}
+  .meal-cal td{border:1px solid var(--border);height:auto;min-height:96px;vertical-align:top;padding:6px;font-size:11.5px;width:14.28%;}
+  .meal-cal td.other-month{background:#faf9fb;color:var(--slate-light);}
+  .meal-cal .day-num{font-weight:700;color:var(--navy);font-size:12px;margin-bottom:4px;}
+  .meal-tag{font-size:8.5px;text-transform:uppercase;color:var(--purple);font-weight:700;margin-top:4px;}
+  .meal-slot-items{min-height:4px;}
+  .meal-slot-items.drag-over{outline:2px dashed var(--purple);background:var(--purple-bg);border-radius:4px;}
+  .meal-item-line{display:flex;align-items:center;gap:3px;font-size:10.5px;color:#1a1a1a;font-weight:500;padding:1px 0;}
+  .meal-item-move{cursor:grab;color:var(--slate-light);font-size:9px;flex-shrink:0;}
+  .meal-item-move:active{cursor:grabbing;}
+  .meal-item-text{flex:1;word-break:break-word;}
+  .meal-item-del{border:none;background:none;color:var(--slate-light);font-size:9px;padding:0 2px;flex-shrink:0;cursor:pointer;}
+  .meal-item-del:hover{color:var(--danger);}
+  .meal-slot-add input{width:100%;border:none;background:transparent;font-size:10px;color:var(--slate-light);padding:1px 0;font-family:inherit;}
+  .meal-slot-add input:focus{outline:none;color:var(--navy);}
+  .meal-slot-add input::placeholder{color:var(--slate-light);}
+
+  .fav-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:10px;}
+  .fav-day{background:var(--lavender);border-radius:10px;padding:12px;}
+  .fav-day h4{margin:0 0 8px 0;font-size:12.5px;text-transform:uppercase;letter-spacing:0.4px;color:var(--purple);}
+  .fav-day ul{margin:0;padding:0;font-size:13px;list-style:none;min-height:6px;}
+  .fav-day .fav-empty{color:var(--slate-light);font-style:italic;margin-bottom:4px;}
+  .fav-item{background:#fff;border-radius:7px;padding:6px 8px;margin-bottom:6px;cursor:grab;}
+  .fav-item:active{cursor:grabbing;}
+  .fav-item.sortable-ghost{opacity:0.35;}
+  .fav-item-row{display:flex;align-items:center;gap:6px;}
+  .fav-drag-dots{color:var(--slate-light);font-size:13px;flex-shrink:0;}
+  .fav-item-text{flex:1;font-size:12.5px;color:var(--navy);}
+  .fav-item .small-x{flex-shrink:0;font-size:10.5px;white-space:nowrap;}
+  .fav-ing-toggle{color:var(--purple);}
+  .fav-add{display:flex;gap:6px;margin-top:8px;}
+  .fav-add input{flex:1;border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12.5px;}
+
+  .fav-ing-panel{margin-top:8px;padding-top:8px;border-top:1px solid var(--border);}
+  .ing-row{display:flex;align-items:center;gap:6px;padding:3px 0;font-size:11.5px;}
+  .ing-row-edit{padding:4px 0;border-bottom:1px solid var(--border);flex-wrap:wrap;}
+  .ing-row-edit:last-child{border-bottom:none;}
+  .ing-row-edit .ing-row-qty{width:40px;border:1px solid var(--border);border-radius:5px;padding:3px 4px;font-size:11px;}
+  .ing-row-edit .ing-row-unit{border:1px solid var(--border);border-radius:5px;padding:3px 2px;font-size:10px;background:#fff;width:52px;}
+  .ing-row-edit .ing-row-name{flex:1;min-width:90px;border:1px solid var(--border);border-radius:5px;padding:3px 4px;font-size:11px;background:#fff;}
+  .ing-row-name{flex:1;color:var(--navy);}
+  .ing-row-cat{color:var(--slate);font-size:10.5px;background:var(--lavender);padding:2px 6px;border-radius:10px;flex-shrink:0;}
+  .ing-empty{font-size:11px;color:var(--slate-light);font-style:italic;margin-bottom:4px;}
+  .ing-add-row{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap;}
+  .ing-add-row .ing-qty-input{width:44px;border:1px solid var(--border);border-radius:5px;padding:4px 5px;font-size:11px;}
+  .ing-add-row .ing-unit-select{border:1px solid var(--border);border-radius:5px;padding:4px 3px;font-size:10.5px;background:#fff;width:56px;}
+  .ing-add-row .ing-name-select{flex:1;min-width:100px;border:1px solid var(--border);border-radius:5px;padding:4px 5px;font-size:11px;background:#fff;}
+  .ing-add-row .ing-add-btn{padding:4px 9px;font-size:11px;flex-shrink:0;}
+
+  #master-ingredients-container{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+  .ing-master-cat{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px;}
+  .ing-master-cat h3{margin:0 0 10px 0;font-size:13.5px;text-transform:uppercase;letter-spacing:0.5px;color:var(--purple);font-family:'DM Sans',sans-serif;font-weight:700;}
+  .ing-master-list{list-style:none;margin:0;padding:0;}
+  .ing-master-list li{display:flex;align-items:center;gap:6px;font-size:13px;padding:4px 0;border-bottom:1px solid var(--border);color:var(--navy);}
+  .ing-master-list li:last-child{border-bottom:none;}
+  .ing-master-list li span{flex:1;}
+  .ing-master-empty{font-size:12.5px;color:var(--slate-light);font-style:italic;list-style:none;}
+  .ing-master-add{display:flex;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);}
+  .ing-master-add input{flex:1;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12.5px;}
+
+  #stock-list-container{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-top:16px;}
+  .stock-cat{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px;}
+  .stock-cat h3{margin:0 0 10px 0;font-size:13.5px;text-transform:uppercase;letter-spacing:0.5px;color:var(--purple);font-family:'DM Sans',sans-serif;font-weight:700;}
+  .stock-row{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;color:var(--navy);}
+  .stock-row:last-child{border-bottom:none;}
+  .stock-row-name{flex:1;}
+  .stock-check{display:flex;align-items:center;gap:4px;font-size:10.5px;color:var(--slate);flex-shrink:0;white-space:nowrap;}
+  .stock-check input{width:14px;height:14px;accent-color:var(--navy);cursor:pointer;}
+  .stock-check.needit input{accent-color:var(--purple);}
+  .stock-row-del{border:none;background:none;color:var(--slate-light);font-size:11px;padding:0 2px;flex-shrink:0;cursor:pointer;}
+  .stock-row-del:hover{color:var(--danger);}
+
+  .setup-note{background:var(--lavender);border-radius:10px;padding:12px 14px;font-size:13px;color:var(--navy-soft);margin-bottom:18px;line-height:1.5;}
+
+  .grid-checklist th, .grid-checklist td{text-align:center;padding:8px 4px;}
+  .grid-checklist thead th{font-size:10.5px;}
+  .grid-checklist td:first-child, .grid-checklist th:first-child{text-align:left;padding:9px 12px;min-width:190px;}
+  .grid-checklist td:first-child input[type=text]{font-weight:600;padding:0;}
+  .grid-checklist input[type=checkbox]{width:16px;height:16px;accent-color:var(--navy);cursor:pointer;}
+
+  select.tag-select{border:1px solid var(--border);border-radius:6px;padding:4px 6px;font-size:12.5px;background:#fff;}
+
+  ::placeholder{color:var(--slate-light);}
+
+  .modal-overlay{
+    display:none;position:fixed;inset:0;background:rgba(49,30,58,0.45);
+    align-items:center;justify-content:center;z-index:1000;
+  }
+  .modal-overlay.show{display:flex;}
+  .modal-box{background:#fff;border-radius:14px;padding:24px;max-width:360px;width:90%;box-shadow:var(--shadow-lg);}
+  .modal-box p{margin:0 0 20px 0;font-size:14.5px;line-height:1.5;color:var(--navy);}
+  .modal-actions{display:flex;justify-content:flex-end;gap:10px;}
+  #grocery-list-container{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+  .grocery-cat{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px;}
+  .grocery-cat h3{margin:0 0 10px 0;font-size:13.5px;text-transform:uppercase;letter-spacing:0.5px;color:var(--purple);font-family:'DM Sans',sans-serif;font-weight:700;}
+  .grocery-items{min-height:6px;}
+  .grocery-item{display:flex;align-items:center;gap:7px;font-size:13.5px;padding:4px 0;color:var(--navy);border-bottom:1px solid var(--border);}
+  .grocery-item input[type=checkbox]{width:15px;height:15px;accent-color:var(--navy);cursor:pointer;flex-shrink:0;}
+  .grocery-item-name{flex:1;}
+  .grocery-item.done .grocery-item-name{text-decoration:line-through;color:var(--slate-light);}
+  .grocery-item:last-child{border-bottom:none;}
+  .grocery-count{font-weight:700;color:var(--purple);font-size:12px;flex-shrink:0;}
+  .grocery-extra span{flex:1;}
+  .grocery-empty{font-size:12.5px;color:var(--slate-light);font-style:italic;padding:4px 0;}
+  .grocery-add-row{display:flex;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);}
+  .grocery-add-row input{flex:1;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12.5px;}
+
+  @media print{
+    .nav, .sheet-toolbar, .cal-nav, .fav-add, .fav-ing-toggle, .fav-del, .fav-drag-dots,
+    .grocery-add-row, #print-grocery-btn, .icon-btn, .page-head p{display:none !important;}
+    .main{padding:0;}
+    #grocery-list-container{grid-template-columns:repeat(2,1fr);}
+    .grocery-cat{border:1px solid #000;break-inside:avoid;}
+    body{background:#fff;}
+  }
+
+  @media (max-width:1000px){
+    #grocery-list-container{grid-template-columns:1fr;}
+    #master-ingredients-container{grid-template-columns:1fr;}
+    #stock-list-container{grid-template-columns:1fr;}
+    .dash-grid{grid-template-columns:1fr;}
+    .daily-tasks-grid{grid-template-columns:1fr;}
+    .two-col{grid-template-columns:1fr;}
+    .fav-grid{grid-template-columns:1fr 1fr;}
+    .app{flex-direction:column;}
+    .nav{width:100%;flex-direction:row;overflow-x:auto;padding:14px 0;}
+    .nav-brand{display:none;}
+    .nav-item{white-space:nowrap;border-left:none;border-bottom:3px solid transparent;}
+    .nav-item.active{border-left:none;border-bottom-color:var(--gold);}
+    .nav-foot{display:none;}
+  }
+</style>
+</head>
+<body>
+
+<div class="modal-overlay" id="confirm-modal">
+  <div class="modal-box">
+    <p id="confirm-modal-text"></p>
+    <div class="modal-actions">
+      <button class="btn secondary" id="confirm-modal-cancel">Cancel</button>
+      <button class="btn danger" id="confirm-modal-ok">Clear All</button>
+    </div>
+  </div>
+</div>
+
+<div class="app">
+  <div class="nav">
+    <div class="nav-brand">Command Center<span>Daily Overview</span></div>
+    <div class="nav-item active" data-page="dashboard">Dashboard</div>
+    <div class="nav-item" data-page="events">Upcoming Events</div>
+    <div class="nav-item" data-page="todo">To-Do Dump</div>
+    <div class="nav-item" data-page="daily">Daily Tasks Setup</div>
+    <div class="nav-item" data-page="monthly">Monthly &amp; Yearly Tasks</div>
+    <div class="nav-item" data-page="meals">Meal Planning</div>
+    <div class="nav-item" data-page="grocery">Grocery List</div>
+    <div class="nav-item" data-page="ingredients">Master Ingredients</div>
+    <div class="nav-item" data-page="stock">Stock Check</div>
+    <div class="nav-item" data-page="checklist">Content Checklist</div>
+    <div class="nav-item" data-page="notes">General Notes</div>
+    <div class="nav-foot">
+      Everything here saves automatically to this browser.
+      <div class="backup-buttons">
+        <button id="export-data-btn" class="nav-backup-btn">⬇ Export Backup</button>
+        <button id="import-data-btn" class="nav-backup-btn">⬆ Import Backup</button>
+        <input type="file" id="import-file-input" accept="application/json" style="display:none;">
+      </div>
+    </div>
+  </div>
+
+  <div class="main">
+
+    <!-- ================= DASHBOARD ================= -->
+    <div class="page active" id="page-dashboard">
+      <div class="page-head">
+        <h1 id="dash-date-heading">Today</h1>
+        <p id="dash-date-sub"></p>
+      </div>
+
+      <div class="dash-grid">
+        <div class="dash-col">
+          <div class="card scripture-card">
+            <h2>Today's Word</h2>
+            <div class="scripture-verse" id="scripture-verse"></div>
+            <div class="scripture-ref" id="scripture-ref"></div>
+            <div class="affirmation-label">Affirmation</div>
+            <div class="affirmation-text" id="affirmation-text"></div>
+          </div>
+
+          <div class="card">
+            <h2>Calendar</h2>
+            <div class="cal-nav">
+              <button id="cal-prev">‹</button>
+              <div class="cal-month" id="cal-month-label"></div>
+              <button id="cal-next">›</button>
+            </div>
+            <table class="cal" id="cal-table"></table>
+          </div>
+
+          <div class="card">
+            <h2>Upcoming Events <span class="sub" id="dash-events-month"></span></h2>
+            <div id="dash-events-list"></div>
+          </div>
+        </div>
+
+        <div class="dash-col">
+          <div class="card">
+            <h2>Tasks To Do <span class="sub" id="todo-count"></span></h2>
+            <div id="dash-todo-list"></div>
+            <div class="quick-add-row">
+              <input type="text" id="quick-add-task" placeholder="Add a task...">
+              <select id="quick-add-tag" class="tag-select">
+                <option value="Home">Home</option>
+                <option value="TNF">TNF</option>
+                <option value="SSBB">SSBB</option>
+                <option value="SSBB_TNF">SSBB &amp; TNF</option>
+              </select>
+              <select id="quick-add-week" class="tag-select">
+                <option value="this">Today / This Week</option>
+                <option value="next">Future / Next Week</option>
+              </select>
+              <button class="btn small" id="quick-add-btn">Add</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <h2>Meals for the Day</h2>
+            <div class="meal-block">
+              <div class="meal-item">
+                <div class="meal-label">Lunch</div>
+                <div class="meal-value" id="dash-lunch"></div>
+              </div>
+              <div class="meal-item">
+                <div class="meal-label">Dinner</div>
+                <div class="meal-value" id="dash-dinner"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <h2>Today I'm Grateful For</h2>
+            <div class="gratitude-list" id="gratitude-list"></div>
+          </div>
+        </div>
+
+        <div class="card span2">
+          <h2>Daily Tasks</h2>
+          <div class="daily-tasks-grid">
+            <div class="dt-col Home">
+              <h3>Home</h3>
+              <div id="dt-home"></div>
+              <div class="dt-add-row">
+                <input type="text" id="dt-add-input-Home" placeholder="Add a task">
+                <button class="icon-btn add-btn" id="dt-add-btn-Home">+</button>
+              </div>
+            </div>
+            <div class="dt-col TNF">
+              <h3>Three Nail Faith</h3>
+              <div id="dt-tnf"></div>
+              <div class="dt-add-row">
+                <input type="text" id="dt-add-input-TNF" placeholder="Add a task">
+                <button class="icon-btn add-btn" id="dt-add-btn-TNF">+</button>
+              </div>
+            </div>
+            <div class="dt-col SSBB">
+              <h3>SSBB</h3>
+              <div id="dt-ssbb"></div>
+              <div class="dt-add-row">
+                <input type="text" id="dt-add-input-SSBB" placeholder="Add a task">
+                <button class="icon-btn add-btn" id="dt-add-btn-SSBB">+</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card span2">
+          <h2>Monthly &amp; Yearly Tasks <span class="sub" id="dash-my-month"></span></h2>
+          <div class="my-list" id="dash-my-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= EVENTS DUMP ================= -->
+    <div class="page" id="page-events">
+      <div class="page-head">
+        <h1>Upcoming Events Dump</h1>
+        <p>Add holidays, birthdays, and appointments here. They'll flow onto the Dashboard automatically. Major U.S. holidays are pre-loaded and repeat every year on their own.</p>
+      </div>
+      <div class="sheet-toolbar">
+        <button class="btn" id="add-event-row">+ Add Event</button>
+      </div>
+      <div style="overflow-x:auto;">
+      <table class="sheet" id="events-table">
+        <thead><tr>
+          <th style="width:128px;">Start Date</th>
+          <th style="width:110px;">Time</th>
+          <th style="width:128px;">End Date</th>
+          <th>Event</th>
+          <th style="width:230px;">Repeat</th>
+          <th style="width:150px;">Who / Business</th>
+          <th class="del-cell"></th>
+        </tr></thead>
+        <tbody id="events-tbody"></tbody>
+      </table>
+      </div>
+    </div>
+
+    <!-- ================= TO-DO DUMP ================= -->
+    <div class="page" id="page-todo">
+      <div class="page-head">
+        <h1>To-Do Dump</h1>
+        <p>Add tasks here in order. The top 10 unfinished tasks show on your Dashboard. Check one off there and the next one moves up. Drag the ⠿ handle to reorder a list, or drag a task straight across from Next Week into This Week (or back) as plans change. Delete finished rows at the end of the week whenever you're ready.</p>
+      </div>
+
+      <div class="section-divider"><span>This Week</span><div class="line"></div></div>
+      <div class="sheet-toolbar">
+        <button class="btn" data-week="this" id="add-todo-this">+ Add Task</button>
+      </div>
+      <table class="sheet">
+        <thead><tr><th style="width:34px;"></th><th style="width:120px;">Tag</th><th>Task</th><th class="chk-cell">Done</th><th class="del-cell"></th></tr></thead>
+        <tbody id="todo-this-tbody"></tbody>
+      </table>
+
+      <div class="section-divider"><span>Next Week</span><div class="line"></div></div>
+      <div class="sheet-toolbar">
+        <button class="btn" data-week="next" id="add-todo-next">+ Add Task</button>
+      </div>
+      <table class="sheet">
+        <thead><tr><th style="width:34px;"></th><th style="width:120px;">Tag</th><th>Task</th><th class="chk-cell">Done</th><th class="del-cell"></th></tr></thead>
+        <tbody id="todo-next-tbody"></tbody>
+      </table>
+    </div>
+
+    <!-- ================= DAILY TASKS SETUP ================= -->
+    <div class="page" id="page-daily">
+      <div class="page-head">
+        <h1>Daily Tasks Setup</h1>
+        <p>Set up the tasks that repeat on the same day every week, tagged Home, TNF, or SSBB. These pull onto the Dashboard for whatever day you're viewing.</p>
+      </div>
+      <div class="setup-note">Tip: this is your recurring weekly rhythm, things like "Monday: trash day, Wednesday: content batching." Add as many as you need per day. Checking one off on the Dashboard only checks it for that specific date, it resets fresh each week.</div>
+      <div id="daily-setup-container"></div>
+    </div>
+
+    <!-- ================= MONTHLY & YEARLY ================= -->
+    <div class="page" id="page-monthly">
+      <div class="page-head">
+        <h1>Monthly &amp; Yearly Tasks</h1>
+        <p>These are tasks tied to a pattern rather than one fixed date, like "the 1st of the month" or "the last Friday of November."</p>
+      </div>
+      <div class="sheet-toolbar">
+        <button class="btn" id="add-my-row">+ Add Recurring Task</button>
+      </div>
+      <table class="sheet">
+        <thead><tr>
+          <th style="width:100px;">Type</th>
+          <th style="width:150px;">Month (if yearly)</th>
+          <th style="width:230px;">When</th>
+          <th>Task</th>
+          <th style="width:120px;">Section</th>
+          <th class="del-cell"></th>
+        </tr></thead>
+        <tbody id="my-tbody"></tbody>
+      </table>
+    </div>
+
+    <!-- ================= MEAL PLANNING ================= -->
+    <div class="page" id="page-meals">
+      <div class="page-head">
+        <h1>Meal Planning</h1>
+        <p>Plan lunch and dinner ahead of time. Drag a favorite onto a day to add it, drop another on top to stack more than one item there (great for a quick side), or drag a favorite between day groups to reorganize. Each item gets its own small "⠿ Move" chip to drag it to a different day. Planning a dessert for a regular day? Just add it to the end of Dinner. For anything bigger, Thanksgiving, Christmas, birthdays, use the Big Meal Planner down in the Favorites section, it has its own Dinner and Dessert space with more room. Click a recipe's ingredient icon to attach ingredients, without cluttering this view, they only show up on the Grocery List page.</p>
+      </div>
+      <div class="cal-nav" style="max-width:900px;">
+        <button id="meal-cal-prev">‹</button>
+        <div class="cal-month" id="meal-cal-month-label"></div>
+        <button id="meal-cal-next">›</button>
+      </div>
+      <table class="meal-cal" id="meal-cal-table"></table>
+
+      <div class="section-divider"><span>Favorite Meals</span><div class="line"></div></div>
+      <p style="font-size:13px;color:var(--slate);margin-top:-6px;">Keep a running list of go-to meals for each day, plus Sides and Desserts for anything you mix and match, Sometimes, Smoked, and Winter / Crockpot for the ones that don't fit a set day, and the Big Meal Planner for the occasional big spread.</p>
+      <div class="fav-grid" id="fav-meals-grid"></div>
+    </div>
+
+    <!-- ================= GROCERY LIST ================= -->
+    <div class="page" id="page-grocery">
+      <div class="page-head">
+        <h1>Grocery List</h1>
+        <p>Automatically pulled from any recipe on your Meal Planning calendar that has ingredients attached, for whichever month you're viewing. Add anything else you're low on directly to a category below.</p>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px;">
+        <div class="cal-nav" style="max-width:280px;margin-bottom:0;">
+          <button id="grocery-prev">‹</button>
+          <div class="cal-month" id="grocery-month-label"></div>
+          <button id="grocery-next">›</button>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn danger" id="clear-grocery-btn">Clear Page</button>
+          <button class="btn secondary" id="print-grocery-btn">Print Grocery List</button>
+        </div>
+      </div>
+      <div id="grocery-list-container"></div>
+    </div>
+
+    <!-- ================= MASTER INGREDIENTS ================= -->
+    <div class="page" id="page-ingredients">
+      <div class="page-head">
+        <h1>Master Ingredients List</h1>
+        <p>Keep one clean list of ingredients per category. When you're adding ingredients to a recipe on the Meal Planning page, you'll pick from this list instead of retyping, so nothing ends up spelled two different ways.</p>
+      </div>
+      <div id="master-ingredients-container"></div>
+    </div>
+
+    <!-- ================= STOCK CHECK ================= -->
+    <div class="page" id="page-stock">
+      <div class="page-head">
+        <h1>Stock Check</h1>
+        <p>Run through this before you head to the store. Check "In Stock" as a reminder that you're good on it, or check "Need It" to send it straight to the Grocery List in the right category. "In Stock" resets fresh each month; "Need It" always matches whatever's currently on your Grocery List.</p>
+      </div>
+      <div class="cal-nav" style="max-width:280px;">
+        <button id="stock-prev">‹</button>
+        <div class="cal-month" id="stock-month-label"></div>
+        <button id="stock-next">›</button>
+      </div>
+      <div id="stock-list-container"></div>
+
+      <div class="section-divider"><span>Add an Item</span><div class="line"></div></div>
+      <div class="sheet-toolbar">
+        <input type="text" id="stock-new-name" placeholder="Item name" style="flex:1;max-width:260px;border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13.5px;">
+        <select id="stock-new-cat" style="border:1px solid var(--border);border-radius:8px;padding:9px 10px;font-size:13px;background:#fff;"></select>
+        <button class="btn" id="stock-add-btn">+ Add Item</button>
+      </div>
+    </div>
+
+    <!-- ================= CONTENT CHECKLIST ================= -->
+    <div class="page" id="page-checklist">
+      <div class="page-head">
+        <h1>Content Checklist</h1>
+        <p>Check things off as you complete them each month. Not connected to the Dashboard.</p>
+      </div>
+      <div class="sheet-toolbar">
+        <button class="btn danger" id="clear-checklist-btn">Clear All Checked Boxes</button>
+      </div>
+
+      <div class="section-divider"><span>TNF — One-Time</span><div class="line"></div></div>
+      <table class="sheet" id="checklist-onetime-table">
+        <thead><tr><th>Item</th><th class="chk-cell">Done</th><th class="del-cell"></th></tr></thead>
+        <tbody id="checklist-onetime-tbody"></tbody>
+      </table>
+      <div class="sheet-toolbar" style="margin-top:10px;">
+        <button class="btn small secondary" id="add-onetime-row">+ Add Item</button>
+      </div>
+
+      <div class="section-divider"><span>TNF — Monthly (Jan – Jan)</span><div class="line"></div></div>
+      <div style="overflow-x:auto;">
+      <table class="sheet grid-checklist" id="checklist-tnf-table">
+        <thead><tr id="checklist-tnf-thead"></tr></thead>
+        <tbody id="checklist-tnf-tbody"></tbody>
+      </table>
+      </div>
+      <div class="sheet-toolbar" style="margin-top:10px;">
+        <button class="btn small secondary" id="add-tnf-grid-row">+ Add Category</button>
+      </div>
+
+      <div class="section-divider"><span>SSBB — Monthly (Jan – Jan)</span><div class="line"></div></div>
+      <div style="overflow-x:auto;">
+      <table class="sheet grid-checklist" id="checklist-ssbb-table">
+        <thead><tr id="checklist-ssbb-thead"></tr></thead>
+        <tbody id="checklist-ssbb-tbody"></tbody>
+      </table>
+      </div>
+      <div class="sheet-toolbar" style="margin-top:10px;">
+        <button class="btn small secondary" id="add-ssbb-grid-row">+ Add Category</button>
+      </div>
+    </div>
+
+    <!-- ================= GENERAL NOTES ================= -->
+    <div class="page" id="page-notes">
+      <div class="page-head">
+        <h1>General Notes</h1>
+        <p>A free space, not connected to the Dashboard. Use it however you'd like.</p>
+      </div>
+      <div class="sheet-toolbar">
+        <button class="btn" id="add-note-row">+ Add Row</button>
+        <button class="btn secondary" id="add-note-col">+ Add Column</button>
+      </div>
+      <table class="sheet" id="notes-table">
+        <thead><tr id="notes-thead-row"></tr></thead>
+        <tbody id="notes-tbody"></tbody>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   DATA LAYER
+   ========================================================= */
+const STORE_KEY = 'tnf_command_center_v1';
+
+function uid(){ return Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4); }
+function pad(n){ return n.toString().padStart(2,'0'); }
+function toISO(d){ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
+function fromISO(s){ const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); }
+function dayName(idx){ return ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][idx]; }
+function monthName(idx){ return ['January','February','March','April','May','June','July','August','September','October','November','December'][idx]; }
+
+const DEFAULT_DATA = {
+  selectedDate: toISO(new Date()),
+  calViewYear: new Date().getFullYear(),
+  calViewMonth: new Date().getMonth(),
+  mealCalViewYear: new Date().getFullYear(),
+  mealCalViewMonth: new Date().getMonth(),
+  bigMealDate: '',
+  events: [],
+  holidaysSeeded: false,
+  todoDump: { this: [], next: [] },
+  dailyRecurring: [], // {id, day(0-6), section, task}
+  dailyCompletion: {}, // key: date|taskId -> true
+  monthlyCompletion: {}, // key: date|taskId (or year-month|taskId for range rules) -> true
+  adhocDaily: {}, // 'YYYY-MM-DD': { Home:[{id,text,done}], TNF:[...], SSBB:[...] }
+  monthlyYearly: [], // {id, type:'monthly'|'yearly', month(0-11, null for monthly), ruleType:'dayOfMonth'|'nthWeekday', day, nth, weekday, task, section}
+  meals: {}, // 'YYYY-MM-DD': {lunch:[{id,text}], dinner:[{id,text}], dessert:[{id,text}]}
+  gratitude: {}, // 'YYYY-MM-DD': ['','','','','']
+  favMeals: { 'Saturday / Sunday':[], 'Monday':[], 'Tuesday / Thursday':[], 'Wednesday':[], 'Friday':[], 'Sometimes':[], 'Smoked':[], 'Winter / Crockpot':[] },
+  groceryExtras: {}, // category -> [{id, name}]
+  groceryCompletion: {}, // key: 'year-month|category|itemname|unit' -> true
+  masterIngredients: {}, // category -> [{id, name}]
+  stockItems: [], // [{id, name, category}]
+  stockItemsSeeded: false,
+  stockInStock: {}, // key: 'year-month|itemId' -> true, resets feel each month
+  stockViewYear: new Date().getFullYear(),
+  stockViewMonth: new Date().getMonth(),
+  groceryViewYear: new Date().getFullYear(),
+  groceryViewMonth: new Date().getMonth(),
+  notesCols: ['Category','Note','Status'],
+  notesRows: [],
+  contentChecklist: {
+    oneTime: [
+      {id:'ot1', label:'Mid year planner', checked:false},
+      {id:'ot2', label:'Pink planner', checked:false},
+      {id:'ot3', label:'Grey planner', checked:false},
+      {id:'ot4', label:'Planner', checked:false}
+    ],
+    tnfGrid: [
+      {id:'tnf-youtube', label:'YouTube', months:Array(13).fill(false)},
+      {id:'tnf-email', label:'Email', months:Array(13).fill(false)},
+      {id:'tnf-blog', label:'Blog', months:Array(13).fill(false)},
+      {id:'tnf-pinterest', label:'Pinterest', months:Array(13).fill(false)},
+      {id:'tnf-devotional', label:'Devotional', months:Array(13).fill(false)},
+      {id:'tnf-images', label:'Images for Social Media', months:Array(13).fill(false)},
+      {id:'tnf-posts', label:'Posts for Social Media', months:Array(13).fill(false)},
+      {id:'tnf-pr-devotional', label:'Prayer Room Devotional', months:Array(13).fill(false)},
+      {id:'tnf-pr-posts', label:'Prayer Room Daily Posts', months:Array(13).fill(false)},
+      {id:'tnf-kpi', label:'KPI', months:Array(13).fill(false)},
+      {id:'tnf-eom', label:'End of Month', months:Array(13).fill(false)}
+    ],
+    ssbbGrid: [
+      {id:'ssbb-email', label:'Email', months:Array(13).fill(false)},
+      {id:'ssbb-images', label:'Images for Social Media', months:Array(13).fill(false)},
+      {id:'ssbb-posts', label:'Posts for Social Media', months:Array(13).fill(false)},
+      {id:'ssbb-kpi', label:'KPI', months:Array(13).fill(false)},
+      {id:'ssbb-eom', label:'End of Month', months:Array(13).fill(false)}
+    ]
+  }
+};
+
+const GROCERY_CATEGORIES = ['Baking','Breads','Cans','Cereal','Condiments','Dairy','Drinks','Ethnic','Frozen','Meats','Misc','Paper / Cleaning','Pasta','Personal','Produce','Snacks','Still Need To Buy'];
+const FAV_MEAL_GROUPS = ['Saturday / Sunday','Monday','Tuesday / Thursday','Wednesday','Friday','Sometimes','Smoked','Winter / Crockpot','Sides','Desserts'];
+const MEASUREMENT_UNITS = ['', 'Cup', 'Oz', 'Tsp', 'Tbl', 'Lbs', 'Piece', 'Can', 'Package', 'Box', 'Bag', 'Jar', 'Bottle', 'Loaf', 'Clove'];
+
+function migrateFavMeals(){
+  const fm = DATA.favMeals || {};
+  function toObjArray(arr){
+    return (arr||[]).map(item => typeof item === 'string' ? {id:uid(), name:item, ingredients:[]} : {id:item.id||uid(), name:item.name||'', ingredients:item.ingredients||[]});
+  }
+  const merged = {};
+  merged['Saturday / Sunday'] = [...toObjArray(fm['Saturday / Sunday']), ...toObjArray(fm['Saturday']), ...toObjArray(fm['Sunday'])];
+  merged['Monday'] = toObjArray(fm['Monday']);
+  merged['Tuesday / Thursday'] = [...toObjArray(fm['Tuesday / Thursday']), ...toObjArray(fm['Tuesday']), ...toObjArray(fm['Thursday'])];
+  merged['Wednesday'] = toObjArray(fm['Wednesday']);
+  merged['Friday'] = toObjArray(fm['Friday']);
+  merged['Sometimes'] = toObjArray(fm['Sometimes']);
+  merged['Smoked'] = toObjArray(fm['Smoked']);
+  merged['Winter / Crockpot'] = toObjArray(fm['Winter / Crockpot']);
+  merged['Sides'] = toObjArray(fm['Sides']);
+  merged['Desserts'] = toObjArray(fm['Desserts']);
+  DATA.favMeals = merged;
+}
+
+function migrateMealsToArrays(){
+  Object.keys(DATA.meals).forEach(dateISO=>{
+    const plan = DATA.meals[dateISO];
+    if(!plan) return;
+    ['lunch','dinner','dessert'].forEach(slot=>{
+      const val = plan[slot];
+      if(Array.isArray(val)){
+        plan[slot] = val.map(v => typeof v === 'string' ? {id:uid(), text:v} : v);
+      } else if(typeof val === 'string' && val.trim()){
+        plan[slot] = [{id:uid(), text:val}];
+      } else {
+        plan[slot] = [];
+      }
+    });
+  });
+}
+function ensureMealDay(dateISO){
+  if(!DATA.meals[dateISO]) DATA.meals[dateISO] = {lunch:[], dinner:[], dessert:[]};
+  const day = DATA.meals[dateISO];
+  if(!Array.isArray(day.lunch)) day.lunch = [];
+  if(!Array.isArray(day.dinner)) day.dinner = [];
+  if(!Array.isArray(day.dessert)) day.dessert = [];
+  return day;
+}
+
+function migrateIngredientsAndMasterList(){
+  if(!DATA.masterIngredients) DATA.masterIngredients = {};
+  GROCERY_CATEGORIES.forEach(c=>{ if(!DATA.masterIngredients[c]) DATA.masterIngredients[c] = []; });
+
+  const seen = {}; // category|namelower -> true, to dedupe seeding
+  Object.values(DATA.favMeals).forEach(list=>{
+    (list||[]).forEach(item=>{
+      item.ingredients = (item.ingredients||[]).map(ing=>{
+        const upgraded = {
+          id: ing.id || uid(),
+          name: ing.name || '',
+          category: GROCERY_CATEGORIES.includes(ing.category) ? ing.category : 'Personal',
+          quantity: ing.quantity !== undefined ? ing.quantity : '',
+          unit: ing.unit !== undefined ? ing.unit : ''
+        };
+        const key = upgraded.category+'|'+upgraded.name.trim().toLowerCase();
+        if(upgraded.name.trim() && !seen[key]){
+          seen[key] = true;
+          const existsInMaster = DATA.masterIngredients[upgraded.category].some(m=>m.name.trim().toLowerCase()===upgraded.name.trim().toLowerCase());
+          if(!existsInMaster) DATA.masterIngredients[upgraded.category].push({id:uid(), name:upgraded.name});
+        }
+        return upgraded;
+      });
+    });
+  });
+}
+
+let DATA = loadData();
+migrateFavMeals();
+migrateMealsToArrays();
+migrateIngredientsAndMasterList();
+seedHolidaysIfNeeded();
+seedStockItemsIfNeeded();
+
+// Always open on today's date, not whatever date was last selected in a previous session
+(function resetToToday(){
+  const todayISO = toISO(new Date());
+  if(DATA.selectedDate !== todayISO){
+    DATA.selectedDate = todayISO;
+    const d = new Date();
+    DATA.calViewYear = d.getFullYear();
+    DATA.calViewMonth = d.getMonth();
+    saveData();
+  }
+})();
+
+function loadData(){
+  try{
+    const raw = localStorage.getItem(STORE_KEY);
+    if(!raw) return JSON.parse(JSON.stringify(DEFAULT_DATA));
+    const parsed = JSON.parse(raw);
+    // merge with defaults so new fields don't break old saves
+    return Object.assign(JSON.parse(JSON.stringify(DEFAULT_DATA)), parsed);
+  }catch(e){
+    console.error('Load error', e);
+    return JSON.parse(JSON.stringify(DEFAULT_DATA));
+  }
+}
+function saveData(){
+  try{
+    localStorage.setItem(STORE_KEY, JSON.stringify(DATA));
+  }catch(e){
+    console.error('Save error', e);
+  }
+}
+
+/* =========================================================
+   TOAST NOTICES
+   ========================================================= */
+function showToast(message){
+  let toast = document.getElementById('toast-notice');
+  if(!toast){
+    toast = document.createElement('div');
+    toast.id = 'toast-notice';
+    toast.className = 'toast-notice';
+    document.body.appendChild(toast);
+  }
+  toast.textContent = message;
+  toast.classList.add('show');
+  clearTimeout(toast._timer);
+  toast._timer = setTimeout(()=>{ toast.classList.remove('show'); }, 3200);
+}
+
+/* =========================================================
+   BACKUP: EXPORT / IMPORT
+   ========================================================= */
+function exportData(){
+  const blob = new Blob([JSON.stringify(DATA, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'command-center-backup-'+toISO(new Date())+'.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('Backup file downloaded.');
+}
+document.getElementById('export-data-btn').addEventListener('click', exportData);
+
+document.getElementById('import-data-btn').addEventListener('click', ()=>{
+  document.getElementById('import-file-input').click();
+});
+document.getElementById('import-file-input').addEventListener('change', (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev)=>{
+    let parsed;
+    try{
+      parsed = JSON.parse(ev.target.result);
+    }catch(err){
+      showToast('That file could not be read. Nothing was changed.');
+      e.target.value = '';
+      return;
+    }
+    showConfirm('Import this backup? This will replace everything currently saved in your dashboard.', ()=>{
+      DATA = Object.assign(JSON.parse(JSON.stringify(DEFAULT_DATA)), parsed);
+      saveData();
+      renderDashboard();
+      showToast('Backup imported successfully.');
+    });
+    e.target.value = '';
+  };
+  reader.readAsText(file);
+});
+
+
+/* =========================================================
+   NAVIGATION
+   ========================================================= */
+document.querySelectorAll('.nav-item').forEach(item=>{
+  item.addEventListener('click', ()=>{
+    document.querySelectorAll('.nav-item').forEach(i=>i.classList.remove('active'));
+    document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+    item.classList.add('active');
+    document.getElementById('page-'+item.dataset.page).classList.add('active');
+    if(item.dataset.page==='daily') renderDailySetup();
+    if(item.dataset.page==='monthly') renderMonthlyYearly();
+    if(item.dataset.page==='meals'){ renderMealCal(); renderFavMeals(); renderBigMealPanel(); }
+    if(item.dataset.page==='grocery') renderGroceryList();
+    if(item.dataset.page==='ingredients') renderMasterIngredients();
+    if(item.dataset.page==='stock') renderStockList();
+    if(item.dataset.page==='checklist') renderChecklist();
+    if(item.dataset.page==='notes') renderNotes();
+    if(item.dataset.page==='events') renderEventsTable();
+    if(item.dataset.page==='todo') renderTodoDump();
+  });
+});
+
+/* =========================================================
+   SCRIPTURE + AFFIRMATION (cycles by day of year)
+   ========================================================= */
+const SCRIPTURE_SET = [
+["The Lord is my shepherd; I shall not want.","Psalm 23:1","Father God provides for every need before I even see it."],
+["Trust in the Lord with all thine heart, and lean not unto thine own understanding.","Proverbs 3:5","Today I release my plans into God's hands and rest in His timing."],
+["Be still, and know that I am God.","Psalm 46:10","Stillness with Father God is not wasted time, it is where peace grows."],
+["I can do all things through Christ which strengtheneth me.","Philippians 4:13","Strength for today comes from walking WITH God, not from my own effort."],
+["For I know the thoughts that I think toward you, saith the Lord, thoughts of peace, and not of evil, to give you an expected end.","Jeremiah 29:11","Hope is steady today because Father God's plans for me are good."],
+["The Lord is my light and my salvation; whom shall I fear?","Psalm 27:1","Fear loses its grip when I remember who is walking beside me."],
+["Cast thy burden upon the Lord, and he shall sustain thee.","Psalm 55:22","Whatever feels heavy today, I can set it down in prayer."],
+["And we know that all things work together for good to them that love God.","Romans 8:28","Even the hard parts of today are being woven into something good."],
+["Come unto me, all ye that labour and are heavy laden, and I will give you rest.","Matthew 11:28","Rest is not a luxury, it is an invitation from Father God."],
+["The joy of the Lord is your strength.","Nehemiah 8:10","Joy fuels me more than hustle ever could."],
+["Fear thou not; for I am with thee: be not dismayed; for I am thy God.","Isaiah 41:10","Courage today is simply remembering I am not doing this alone."],
+["This is the day which the Lord hath made; we will rejoice and be glad in it.","Psalm 118:24","Today is a gift, and I choose to receive it with gladness."],
+["Delight thyself also in the Lord: and he shall give thee the desires of thine heart.","Psalm 37:4","Joy in Father God's presence reshapes what my heart even desires."],
+["Let not your heart be troubled: ye believe in God, believe also in me.","John 14:1","Peace is available to me right now, not just after the to-do list is done."],
+["The Lord thy God in the midst of thee is mighty; he will save, he will rejoice over thee with joy.","Zephaniah 3:17","Father God delights in me, not just in what I get done today."],
+["Wait on the Lord: be of good courage, and he shall strengthen thine heart.","Psalm 27:14","Patience today is an act of trust, not a sign of falling behind."],
+["My grace is sufficient for thee: for my strength is made perfect in weakness.","2 Corinthians 12:9","Weak moments today are where Father God's strength shows up clearest."],
+["In all thy ways acknowledge him, and he shall direct thy paths.","Proverbs 3:6","Every decision today gets easier when I bring it to God first."],
+["The Lord will fight for you, and ye shall hold your peace.","Exodus 14:14","Some battles today are not mine to carry alone."],
+["Peace I leave with you, my peace I give unto you.","John 14:27","A settled heart today is a gift, not something I have to earn."],
+["Rejoice in the Lord alway: and again I say, Rejoice.","Philippians 4:4","Joy is a choice available to me in this exact moment."],
+["He giveth power to the faint; and to them that have no might he increaseth strength.","Isaiah 40:29","Tired does not mean weak, Father God meets me right there."],
+["Be careful for nothing; but in every thing by prayer and supplication let your requests be made known unto God.","Philippians 4:6","Worry can turn into a prayer the moment I notice it today."],
+["The name of the Lord is a strong tower: the righteous runneth into it, and is safe.","Proverbs 18:10","When today feels unsteady, Father God is a place I can run to."],
+["Blessed are they that mourn: for they shall be comforted.","Matthew 5:4","Comfort meets me exactly in the places I feel the most tender today."],
+["Ye are the light of the world.","Matthew 5:14","Something small I do today can be light for someone else."],
+["Commit thy way unto the Lord; trust also in him; and he shall bring it to pass.","Psalm 37:5","Today's plans belong to God, not just to my own effort."],
+["Be strong and of a good courage, be not afraid, neither be thou dismayed: for the Lord thy God is with thee.","Joshua 1:9","Courage today is not the absence of fear, it is walking forward anyway."],
+["The Lord is nigh unto them that are of a broken heart.","Psalm 34:18","Father God is closest to me on the days that feel the heaviest."],
+["Draw nigh to God, and he will draw nigh to you.","James 4:8","One small step toward God today is met with His full presence."],
+["Now the God of hope fill you with all joy and peace in believing.","Romans 15:13","Hope today is not naive, it is rooted in who God has always been."],
+["The Lord is good, a strong hold in the day of trouble.","Nahum 1:7","Trouble today does not get the final word."],
+["Ask, and it shall be given you; seek, and ye shall find.","Matthew 7:7","Asking Father God for help today is not weakness, it is wisdom."],
+["The eternal God is thy refuge, and underneath are the everlasting arms.","Deuteronomy 33:27","I am held today, even in the moments that feel unsteady."],
+["A merry heart doeth good like a medicine.","Proverbs 17:22","Laughter today is not a distraction, it is nourishment."],
+["Be not afraid of sudden fear.","Proverbs 3:25","Surprises today do not have to shake my peace."],
+["The Lord shall preserve thy going out and thy coming in.","Psalm 121:8","Every part of today, coming and going, is covered."],
+["Let all that you do be done in love.","1 Corinthians 16:14","Love can shape the smallest task on today's list."],
+["Give thanks unto the Lord; for he is good.","Psalm 107:1","Gratitude today changes how the whole day feels."],
+["Search me, O God, and know my heart.","Psalm 139:23","Honesty with Father God today makes room for real growth."],
+["Be ye kind one to another, tenderhearted, forgiving one another.","Ephesians 4:32","Kindness today costs me little and gives someone else so much."],
+["The steadfast love of the Lord never ceases.","Lamentations 3:22","Nothing about today can outrun God's steady love."],
+["Underneath are the everlasting arms.","Deuteronomy 33:27","Support is there today even in the moments I cannot see it."],
+["He healeth the broken in heart, and bindeth up their wounds.","Psalm 147:3","Healing today happens quietly, sometimes without me even noticing."],
+["Ye shall know the truth, and the truth shall make you free.","John 8:32","Truth today brings freedom, even when it is hard to hear."],
+["The Lord is my strength and my shield.","Psalm 28:7","Protection and strength today come from the same steady source."],
+["Great is thy faithfulness.","Lamentations 3:23","Faithfulness today does not depend on how I feel, it depends on who God is."],
+["Let your light so shine before men, that they may see your good works.","Matthew 5:16","Quiet faithfulness today can be a light someone else needed."],
+["Blessed is the man that trusteth in the Lord, and whose hope the Lord is.","Jeremiah 17:7","Hope today is anchored in something steadier than circumstances."],
+["My soul, wait thou only upon God; for my expectation is from him.","Psalm 62:5","Waiting today is not wasted, it is where trust is built."],
+["The Lord hath done great things for us; whereof we are glad.","Psalm 126:3","Today holds proof, however small, of God's goodness."],
+["He that dwelleth in the secret place of the most High shall abide under the shadow of the Almighty.","Psalm 91:1","Shelter today is only a prayer away."],
+["Ye have not, because ye ask not.","James 4:2","Today, I do not have to figure it all out alone, I can simply ask."],
+["Be of one mind, live in peace; and the God of love and peace shall be with you.","2 Corinthians 13:11","Peace today starts with a settled, willing heart."],
+["The Lord upholdeth all that fall, and raiseth up all those that be bowed down.","Psalm 145:14","Stumbling today does not mean I am left there."],
+["Continue in prayer, and watch in the same with thanksgiving.","Colossians 4:2","A thankful prayer today reshapes how I see everything else."],
+["He hath made every thing beautiful in his time.","Ecclesiastes 3:11","Today does not have to be finished or perfect to be beautiful."],
+["The Lord will give strength unto his people; the Lord will bless his people with peace.","Psalm 29:11","Strength and peace today are both gifts, not things I have to manufacture."],
+["Godliness with contentment is great gain.","1 Timothy 6:6","Contentment today is worth more than checking every box."],
+["Casting all your care upon him; for he careth for you.","1 Peter 5:7","Care today is not something I carry alone, it is something I hand over."],
+["The Lord is good unto them that wait for him.","Lamentations 3:25","Slow answers today do not mean forgotten prayers."],
+["Charity suffereth long, and is kind.","1 Corinthians 13:4","Patience with others today is one of the truest forms of love."]
+];
+
+function getDayOfYear(d){
+  const start = new Date(d.getFullYear(),0,0);
+  const diff = d - start;
+  return Math.floor(diff / 86400000);
+}
+function renderScripture(dateObj){
+  const doy = getDayOfYear(dateObj);
+  const entry = SCRIPTURE_SET[doy % SCRIPTURE_SET.length];
+  document.getElementById('scripture-verse').textContent = '"'+entry[0]+'"';
+  document.getElementById('scripture-ref').textContent = entry[1].toUpperCase();
+  document.getElementById('affirmation-text').textContent = entry[2];
+}
+
+/* =========================================================
+   DASHBOARD DATE HEADER
+   ========================================================= */
+function renderDashHeader(dateObj){
+  const isToday = toISO(dateObj) === toISO(new Date());
+  document.getElementById('dash-date-heading').textContent = isToday ? 'Today' : dayName(dateObj.getDay());
+  document.getElementById('dash-date-sub').textContent = monthName(dateObj.getMonth())+' '+dateObj.getDate()+', '+dateObj.getFullYear();
+}
+
+/* =========================================================
+   CALENDAR (Dashboard)
+   ========================================================= */
+function renderCalendar(){
+  const y = DATA.calViewYear, m = DATA.calViewMonth;
+  document.getElementById('cal-month-label').textContent = monthName(m)+' '+y;
+  const table = document.getElementById('cal-table');
+  const selected = fromISO(DATA.selectedDate);
+  const today = new Date();
+  const firstDay = new Date(y,m,1);
+  const startOffset = firstDay.getDay(); // Sunday start
+  const daysInMonth = new Date(y,m+1,0).getDate();
+  const daysInPrevMonth = new Date(y,m,0).getDate();
+
+  const eventDates = new Set();
+  const monthStartD = new Date(y,m,1), monthEndD = new Date(y,m+1,0);
+  DATA.events.forEach(ev=>{
+    const occs = getEventOccurrencesForMonth(ev, y, m);
+    occs.forEach(occ=>{
+      let d = new Date(Math.max(occ.start, monthStartD));
+      const end = new Date(Math.min(occ.end, monthEndD));
+      while(d<=end){ eventDates.add(toISO(d)); d = addDays(d,1); }
+    });
+  });
+
+  let html = '<thead><tr>';
+  ['S','M','T','W','T','F','S'].forEach(d=>html+='<th>'+d+'</th>');
+  html+='</tr></thead><tbody>';
+
+  let cells = [];
+  for(let i=startOffset-1;i>=0;i--){
+    cells.push({day: daysInPrevMonth-i, otherMonth:true, y: m===0?y-1:y, m: m===0?11:m-1});
+  }
+  for(let d=1;d<=daysInMonth;d++){
+    cells.push({day:d, otherMonth:false, y:y, m:m});
+  }
+  let next=1;
+  while(cells.length % 7 !== 0 || cells.length < 42){
+    cells.push({day:next, otherMonth:true, y: m===11?y+1:y, m: m===11?0:m+1});
+    next++;
+    if(cells.length>=42) break;
+  }
+
+  for(let row=0; row<cells.length/7; row++){
+    const rowCells = cells.slice(row*7, row*7+7);
+    const rowISOs = rowCells.map(c=> c.y+'-'+pad(c.m+1)+'-'+pad(c.day));
+    const isCurWeek = rowISOs.includes(DATA.selectedDate);
+    html += '<tr'+(isCurWeek?' class="cur-week"':'')+'>';
+    rowCells.forEach(c=>{
+      const iso = c.y+'-'+pad(c.m+1)+'-'+pad(c.day);
+      const isToday = iso === toISO(today);
+      const isSelected = iso === DATA.selectedDate;
+      const hasEvent = eventDates.has(iso);
+      let cls = 'cal-day';
+      if(c.otherMonth) cls += ' other-month';
+      if(isToday) cls += ' today';
+      if(isSelected) cls += ' selected';
+      if(hasEvent) cls += ' has-event';
+      html += '<td><div class="'+cls+'" data-iso="'+iso+'">'+c.day+'</div></td>';
+    });
+    html += '</tr>';
+  }
+  html += '</tbody>';
+  table.innerHTML = html;
+
+  table.querySelectorAll('.cal-day').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      DATA.selectedDate = el.dataset.iso;
+      const d = fromISO(el.dataset.iso);
+      DATA.calViewYear = d.getFullYear();
+      DATA.calViewMonth = d.getMonth();
+      saveData();
+      renderDashboard();
+    });
+  });
+}
+document.getElementById('cal-prev').addEventListener('click', ()=>{
+  DATA.calViewMonth--; if(DATA.calViewMonth<0){DATA.calViewMonth=11;DATA.calViewYear--;}
+  saveData(); renderCalendar(); renderDashEvents(); renderDashMonthlyYearly();
+});
+document.getElementById('cal-next').addEventListener('click', ()=>{
+  DATA.calViewMonth++; if(DATA.calViewMonth>11){DATA.calViewMonth=0;DATA.calViewYear++;}
+  saveData(); renderCalendar(); renderDashEvents(); renderDashMonthlyYearly();
+});
+
+/* =========================================================
+   EVENTS (dump page + dashboard list)
+   ========================================================= */
+function addDays(date, n){ const d = new Date(date); d.setDate(d.getDate()+n); return d; }
+function daysBetweenDates(a,b){ return Math.round((b-a)/86400000); }
+
+const TIME_OPTIONS = (()=>{
+  const opts = [{value:'', label:'No specific time'}];
+  for(let h=0;h<24;h++){
+    for(let m=0;m<60;m+=30){
+      const value = pad(h)+':'+pad(m);
+      let h12 = h%12; if(h12===0) h12=12;
+      const label = h12+':'+pad(m)+' '+(h<12?'AM':'PM');
+      opts.push({value, label});
+    }
+  }
+  return opts;
+})();
+function formatTime(hhmm){
+  if(!hhmm) return '';
+  const [h,m] = hhmm.split(':').map(Number);
+  let h12 = h%12; if(h12===0) h12=12;
+  return h12+':'+pad(m)+' '+(h<12?'AM':'PM');
+}
+
+const REPEAT_NTH_LABELS = {1:'1st',2:'2nd',3:'3rd',4:'4th',5:'5th',[-1]:'Last'};
+
+function seedHolidaysIfNeeded(){
+  if(DATA.holidaysSeeded) return;
+  const Y = new Date().getFullYear();
+  function fixedYearly(title, month, day){
+    const iso = Y+'-'+pad(month+1)+'-'+pad(day);
+    return {id:uid(), startDate:iso, endDate:iso, time:'', title, who:'Holiday', repeatType:'yearly', repeatInterval:2, repeatNth:1, repeatWeekday:1, repeatMonth:month};
+  }
+  function nthYearly(title, month, nth, weekday){
+    const day = nthWeekdayDate(Y, month, nth, weekday);
+    const iso = Y+'-'+pad(month+1)+'-'+pad(day);
+    return {id:uid(), startDate:iso, endDate:iso, time:'', title, who:'Holiday', repeatType:'yearlyNth', repeatInterval:2, repeatNth:nth, repeatWeekday:weekday, repeatMonth:month};
+  }
+  const holidays = [
+    fixedYearly("New Year's Day", 0, 1),
+    nthYearly('MLK Day', 0, 3, 1),
+    fixedYearly("Valentine's Day", 1, 14),
+    nthYearly("Presidents Day", 1, 3, 1),
+    fixedYearly("St. Patrick's Day", 2, 17),
+    nthYearly("Mother's Day", 4, 2, 0),
+    nthYearly("Memorial Day", 4, -1, 1),
+    nthYearly("Father's Day", 5, 3, 0),
+    fixedYearly("Independence Day", 6, 4),
+    nthYearly("Labor Day", 8, 1, 1),
+    fixedYearly("Halloween", 9, 31),
+    fixedYearly("Veterans Day", 10, 11),
+    nthYearly("Thanksgiving", 10, 4, 4),
+    fixedYearly("Christmas Eve", 11, 24),
+    fixedYearly("Christmas Day", 11, 25),
+    fixedYearly("New Year's Eve", 11, 31)
+  ];
+  DATA.events.push(...holidays);
+  DATA.holidaysSeeded = true;
+  saveData();
+}
+
+function seedStockItemsIfNeeded(){
+  if(DATA.stockItemsSeeded) return;
+  const items = [
+    ['Excedrin','Personal'], ['Tylenol','Personal'], ['Romain noodles','Pasta'],
+    ['Peanut butter pretzels','Snacks'], ['Work garbage bags','Paper / Cleaning'],
+    ['Garbage bags','Paper / Cleaning'], ['Paper towels','Paper / Cleaning'],
+    ['Bologna','Meats'], ['Bread','Breads'], ['Laundry detergent','Paper / Cleaning'],
+    ['Snack bags','Paper / Cleaning'], ['Fold top bags','Paper / Cleaning'],
+    ['Gallon bags','Paper / Cleaning'], ['Quart bags','Paper / Cleaning'],
+    ['Sandwich bags','Paper / Cleaning'], ['Toothpicks','Misc'], ['Frozen fruit','Frozen'],
+    ['Greens bags for shake','Produce'], ['Cheese pizzas mini','Frozen'],
+    ['Meat pizzas mini','Frozen'], ['Trentons icecream','Frozen'], ['Icecream','Frozen'],
+    ['Liquid IV 20','Drinks'], ['Electrolyte packets 60','Drinks'],
+    ['Chicken rice meals','Frozen'], ['Napkins','Paper / Cleaning'],
+    ['Toilet paper','Paper / Cleaning'], ['B toilet paper','Paper / Cleaning'],
+    ['Square tissue boxes','Paper / Cleaning'], ['Rectangle tissue boxes','Paper / Cleaning'],
+    ['Shampoo','Personal'], ['Deodorant','Personal'], ['Water bottles','Drinks'],
+    ['Protein shakes','Drinks'], ['Hand soap refill','Paper / Cleaning'],
+    ['Dawn soap refill','Paper / Cleaning'], ['Coffee','Drinks'], ['J honey','Baking'],
+    ['Honey','Baking'], ['Sponges','Paper / Cleaning'], ['Dryer sheets','Paper / Cleaning'],
+    ['Peanut butter','Condiments'], ['Grape jelly','Condiments'], ['s/f caramel','Condiments'],
+    ['s/f chocolate','Condiments'], ['Chocolate syrup','Condiments'],
+    ['Pancake syrup','Condiments'], ['s/f pancake syrup','Condiments']
+  ];
+  DATA.stockItems = items.map(([name,category])=>({id:uid(), name, category}));
+  DATA.stockItemsSeeded = true;
+  saveData();
+}
+
+function getEventOccurrencesForMonth(ev, year, month){
+  if(!ev.startDate || !ev.title) return [];
+  const baseStart = fromISO(ev.startDate);
+  const baseEnd = fromISO(ev.endDate || ev.startDate);
+  const rangeDays = Math.max(0, daysBetweenDates(baseStart, baseEnd));
+  const monthStart = new Date(year, month, 1);
+  const monthEnd = new Date(year, month+1, 0);
+  const results = [];
+  function tryAdd(occStart){
+    const occEnd = addDays(occStart, rangeDays);
+    if(occEnd >= monthStart && occStart <= monthEnd) results.push({start:occStart, end:occEnd});
+  }
+  if(ev.repeatType === 'yearly'){
+    tryAdd(new Date(year, baseStart.getMonth(), baseStart.getDate()));
+  } else if(ev.repeatType === 'yearlyNth'){
+    if(ev.repeatMonth === month){
+      const day = nthWeekdayDate(year, month, ev.repeatNth, ev.repeatWeekday);
+      const daysInThisMonth = new Date(year, month+1, 0).getDate();
+      if(day >= 1 && day <= daysInThisMonth){
+        tryAdd(new Date(year, month, day));
+      }
+    }
+  } else if(ev.repeatType === 'nthAnyMonth'){
+    const startYearMonth = baseStart.getFullYear()*12 + baseStart.getMonth();
+    const thisYearMonth = year*12 + month;
+    if(thisYearMonth >= startYearMonth){
+      const day = nthWeekdayDate(year, month, ev.repeatNth, ev.repeatWeekday);
+      const daysInThisMonth = new Date(year, month+1, 0).getDate();
+      if(day >= 1 && day <= daysInThisMonth){
+        tryAdd(new Date(year, month, day));
+      }
+    }
+  } else if(ev.repeatType === 'weeks'){
+    const interval = Math.max(1, ev.repeatInterval||1);
+    const stepDays = interval*7;
+    if(baseStart <= monthEnd){
+      const diffDays = daysBetweenDates(baseStart, monthStart) - rangeDays;
+      let k = Math.floor(diffDays/stepDays);
+      if(k<0) k=0;
+      let occStart = addDays(baseStart, k*stepDays);
+      let guard = 0;
+      while(occStart <= monthEnd && guard<300){
+        if(occStart >= baseStart) tryAdd(occStart);
+        occStart = addDays(occStart, stepDays);
+        guard++;
+      }
+    }
+  } else {
+    tryAdd(baseStart);
+  }
+  return results;
+}
+
+function renderEventsTable(){
+  cleanupPastNonRepeatingEvents();
+  const tbody = document.getElementById('events-tbody');
+  tbody.innerHTML = '';
+  DATA.events.forEach(ev=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><input type="date" value="${ev.startDate||''}" data-field="startDate"></td>
+      <td>
+        <select data-field="time" style="width:100%;border:none;padding:10px 8px;font-size:12.5px;">
+          ${TIME_OPTIONS.map(o=>`<option value="${o.value}" ${ev.time===o.value?'selected':''}>${o.label}</option>`).join('')}
+        </select>
+      </td>
+      <td><input type="date" value="${ev.endDate||ev.startDate||''}" data-field="endDate"></td>
+      <td><input type="text" placeholder="Event name" value="${escapeAttr(ev.title||'')}" data-field="title"></td>
+      <td class="ev-repeat-cell"></td>
+      <td><input type="text" placeholder="Who / business" value="${escapeAttr(ev.who||'')}" data-field="who"></td>
+      <td class="del-cell"><button class="icon-btn" title="Delete">✕</button></td>
+    `;
+    tr.querySelectorAll('input[data-field], select[data-field]').forEach(inp=>{
+      const evt = inp.tagName==='SELECT' ? 'change' : 'input';
+      inp.addEventListener(evt, ()=>{
+        const field = inp.dataset.field;
+        ev[field] = inp.value;
+        if(field==='startDate' && (!ev.endDate || ev.endDate < ev.startDate)) ev.endDate = ev.startDate;
+        saveData();
+        renderDashboard();
+      });
+    });
+
+    const repeatCell = tr.querySelector('.ev-repeat-cell');
+    function renderRepeatCell(){
+      repeatCell.innerHTML = `
+        <div style="display:flex;gap:4px;padding:6px 8px;align-items:center;flex-wrap:wrap;">
+          <select data-field="repeatType" style="border:1px solid var(--border);border-radius:6px;font-size:11.5px;padding:3px;">
+            <option value="none" ${ev.repeatType==='none'||!ev.repeatType?'selected':''}>Does not repeat</option>
+            <option value="yearly" ${ev.repeatType==='yearly'?'selected':''}>Yearly, same date</option>
+            <option value="yearlyNth" ${ev.repeatType==='yearlyNth'?'selected':''}>Yearly, nth weekday (one month)</option>
+            <option value="nthAnyMonth" ${ev.repeatType==='nthAnyMonth'?'selected':''}>Nth weekday, any month it happens</option>
+            <option value="weeks" ${ev.repeatType==='weeks'?'selected':''}>Every N weeks</option>
+          </select>
+        </div>
+        <div class="ev-repeat-detail" style="padding:0 8px 6px 8px;"></div>
+      `;
+      const detail = repeatCell.querySelector('.ev-repeat-detail');
+      if(ev.repeatType==='yearlyNth'){
+        detail.innerHTML = `
+          <select data-field="repeatNth" style="border:1px solid var(--border);border-radius:6px;font-size:11.5px;padding:3px;margin-right:3px;">
+            ${[1,2,3,4,5,-1].map(n=>`<option value="${n}" ${ev.repeatNth===n?'selected':''}>${REPEAT_NTH_LABELS[n]}</option>`).join('')}
+          </select>
+          <select data-field="repeatWeekday" style="border:1px solid var(--border);border-radius:6px;font-size:11.5px;padding:3px;margin-right:3px;">
+            ${Array.from({length:7},(_,i)=>`<option value="${i}" ${ev.repeatWeekday===i?'selected':''}>${dayName(i)}</option>`).join('')}
+          </select>
+          <select data-field="repeatMonth" style="border:1px solid var(--border);border-radius:6px;font-size:11.5px;padding:3px;">
+            ${Array.from({length:12},(_,i)=>`<option value="${i}" ${ev.repeatMonth===i?'selected':''}>${monthName(i)}</option>`).join('')}
+          </select>
+          <div style="font-size:10.5px;color:var(--slate-light);margin-top:3px;">Happens every year in ${monthName(ev.repeatMonth||0)} only, like a holiday.</div>
+        `;
+      } else if(ev.repeatType==='nthAnyMonth'){
+        detail.innerHTML = `
+          <select data-field="repeatNth" style="border:1px solid var(--border);border-radius:6px;font-size:11.5px;padding:3px;margin-right:3px;">
+            ${[1,2,3,4,5,-1].map(n=>`<option value="${n}" ${ev.repeatNth===n?'selected':''}>${REPEAT_NTH_LABELS[n]}</option>`).join('')}
+          </select>
+          <select data-field="repeatWeekday" style="border:1px solid var(--border);border-radius:6px;font-size:11.5px;padding:3px;">
+            ${Array.from({length:7},(_,i)=>`<option value="${i}" ${ev.repeatWeekday===i?'selected':''}>${dayName(i)}</option>`).join('')}
+          </select>
+          <div style="font-size:10.5px;color:var(--slate-light);margin-top:3px;">Automatically shows up in whichever months actually have a ${REPEAT_NTH_LABELS[ev.repeatNth||5]} ${dayName(ev.repeatWeekday||4)}, no need to pick which ones.</div>
+        `;
+      } else if(ev.repeatType==='weeks'){
+        detail.innerHTML = `
+          <span style="font-size:11.5px;color:var(--slate);">every</span>
+          <input type="number" min="1" max="52" value="${ev.repeatInterval||2}" data-field="repeatInterval" style="width:44px;border:1px solid var(--border);border-radius:6px;font-size:11.5px;padding:3px 4px;margin:0 3px;">
+          <span style="font-size:11.5px;color:var(--slate);">week(s) on ${dayName(fromISO(ev.startDate||DATA.selectedDate).getDay())}</span>
+        `;
+      } else {
+        detail.innerHTML = '';
+      }
+      detail.querySelectorAll('[data-field]').forEach(inp=>{
+        const evt = inp.tagName==='SELECT' ? 'change' : 'input';
+        inp.addEventListener(evt, e=>{
+          const f = inp.dataset.field;
+          ev[f] = (f==='repeatInterval') ? Number(e.target.value) : (f==='repeatNth'||f==='repeatWeekday'||f==='repeatMonth' ? Number(e.target.value) : e.target.value);
+          saveData(); renderRepeatCell(); renderDashboard();
+        });
+      });
+    }
+    renderRepeatCell();
+    repeatCell.querySelector('[data-field=repeatType]').addEventListener('change', e=>{
+      ev.repeatType = e.target.value;
+      if(ev.repeatType==='yearlyNth' && ev.repeatMonth===undefined){
+        const d = fromISO(ev.startDate||DATA.selectedDate);
+        ev.repeatMonth = d.getMonth(); ev.repeatNth = 1; ev.repeatWeekday = d.getDay();
+      }
+      if(ev.repeatType==='nthAnyMonth' && ev.repeatNth===undefined){
+        const d = fromISO(ev.startDate||DATA.selectedDate);
+        ev.repeatNth = 5; ev.repeatWeekday = d.getDay();
+      }
+      if(ev.repeatType==='weeks' && !ev.repeatInterval) ev.repeatInterval = 2;
+      saveData(); renderRepeatCell(); renderDashboard();
+    });
+
+    tr.querySelector('.icon-btn').addEventListener('click', ()=>{
+      DATA.events = DATA.events.filter(e=>e.id!==ev.id);
+      saveData(); renderEventsTable(); renderDashboard();
+    });
+    tbody.appendChild(tr);
+  });
+}
+document.getElementById('add-event-row').addEventListener('click', ()=>{
+  DATA.events.unshift({id:uid(), startDate: DATA.selectedDate, endDate: DATA.selectedDate, time:'', title:'', who:'', repeatType:'none', repeatInterval:2, repeatNth:1, repeatWeekday:1, repeatMonth:0});
+  saveData(); renderEventsTable();
+});
+
+function cleanupPastNonRepeatingEvents(){
+  const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+  const before = DATA.events.length;
+  DATA.events = DATA.events.filter(ev=>{
+    if(ev.repeatType && ev.repeatType !== 'none') return true;
+    if(!ev.startDate) return true;
+    const end = fromISO(ev.endDate || ev.startDate);
+    return end >= todayStart;
+  });
+  if(DATA.events.length !== before) saveData();
+}
+
+function getMonthEvents(year, month){
+  const items = [];
+  DATA.events.forEach(ev=>{
+    const occs = getEventOccurrencesForMonth(ev, year, month);
+    occs.forEach(occ=>{
+      items.push({start: occ.start, end: occ.end, title: ev.title, who: ev.who, time: ev.time});
+    });
+  });
+  items.sort((a,b)=>a.start-b.start);
+  return items;
+}
+function renderDashEvents(){
+  const y = DATA.calViewYear, m = DATA.calViewMonth;
+  document.getElementById('dash-events-month').textContent = monthName(m);
+  const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+  const list = getMonthEvents(y, m).filter(ev => ev.end >= todayStart);
+  const el = document.getElementById('dash-events-list');
+  if(list.length===0){ el.innerHTML = '<div class="empty-slot">No upcoming events for '+monthName(m)+'.</div>'; return; }
+  el.innerHTML = list.map(ev=>{
+    const sameDay = toISO(ev.start) === toISO(ev.end);
+    const dateLabel = sameDay
+      ? monthName(ev.start.getMonth()).slice(0,3)+' '+ev.start.getDate()
+      : monthName(ev.start.getMonth()).slice(0,3)+' '+ev.start.getDate()+'\u2013'+monthName(ev.end.getMonth()).slice(0,3)+' '+ev.end.getDate();
+    const timeLabel = ev.time ? formatTime(ev.time) : '';
+    return `<div class="event-row">
+      <div class="event-date">${dateLabel}${timeLabel?'<br><span style="font-weight:400;color:var(--slate);">'+timeLabel+'</span>':''}</div>
+      <div class="event-title">${escapeHTML(ev.title)}</div>
+      <div class="event-badge">${escapeHTML(ev.who||'')}</div>
+    </div>`;
+  }).join('');
+}
+
+/* =========================================================
+   TO-DO DUMP + DASHBOARD 10-SLOT LIST
+   ========================================================= */
+function renderTodoDump(){
+  ['this','next'].forEach(week=>{
+    const tbody = document.getElementById('todo-'+week+'-tbody');
+    tbody.innerHTML = '';
+    DATA.todoDump[week].forEach(t=>{
+      const tr = document.createElement('tr');
+      tr.dataset.id = t.id;
+      if(t.done) tr.classList.add('row-done');
+      tr.innerHTML = `
+        <td class="drag-handle" title="Drag to reorder">⠿</td>
+        <td>
+          <select class="tag-select" data-field="tag" style="width:100%;border:none;">
+            <option value="Home" ${t.tag==='Home'?'selected':''}>Home</option>
+            <option value="TNF" ${t.tag==='TNF'?'selected':''}>TNF</option>
+            <option value="SSBB" ${t.tag==='SSBB'?'selected':''}>SSBB</option>
+            <option value="SSBB_TNF" ${t.tag==='SSBB_TNF'?'selected':''}>SSBB &amp; TNF</option>
+          </select>
+        </td>
+        <td><input type="text" placeholder="Task" value="${escapeAttr(t.task||'')}" data-field="task"></td>
+        <td class="chk-cell"><input type="checkbox" ${t.done?'checked':''} data-field="done"></td>
+        <td class="del-cell"><button class="icon-btn" title="Delete">✕</button></td>
+      `;
+      tr.querySelector('[data-field=tag]').addEventListener('change', e=>{ t.tag=e.target.value; saveData(); renderDashTodo(); });
+      tr.querySelector('[data-field=task]').addEventListener('input', e=>{ t.task=e.target.value; saveData(); renderDashTodo(); });
+      tr.querySelector('[data-field=done]').addEventListener('change', e=>{ t.done=e.target.checked; saveData(); renderTodoDump(); renderDashTodo(); });
+      tr.querySelector('.icon-btn').addEventListener('click', ()=>{
+        DATA.todoDump[week] = DATA.todoDump[week].filter(x=>x.id!==t.id);
+        saveData(); renderTodoDump(); renderDashTodo();
+      });
+      tbody.appendChild(tr);
+    });
+  });
+}
+document.getElementById('add-todo-this').addEventListener('click', ()=>{
+  DATA.todoDump.this.push({id:uid(), tag:'Home', task:'', done:false});
+  saveData(); renderTodoDump();
+});
+document.getElementById('add-todo-next').addEventListener('click', ()=>{
+  DATA.todoDump.next.push({id:uid(), tag:'Home', task:'', done:false});
+  saveData(); renderTodoDump();
+});
+
+function syncTodoListsFromDOM(){
+  const thisTbody = document.getElementById('todo-this-tbody');
+  const nextTbody = document.getElementById('todo-next-tbody');
+  const allTasks = [...DATA.todoDump.this, ...DATA.todoDump.next];
+  const findTask = id => allTasks.find(t=>t.id===id);
+  DATA.todoDump.this = [...thisTbody.children].map(tr=>findTask(tr.dataset.id)).filter(Boolean);
+  DATA.todoDump.next = [...nextTbody.children].map(tr=>findTask(tr.dataset.id)).filter(Boolean);
+  saveData();
+}
+
+function initTodoSortable(week){
+  const tbody = document.getElementById('todo-'+week+'-tbody');
+  if(typeof Sortable === 'undefined' || !tbody) return;
+  new Sortable(tbody, {
+    handle: '.drag-handle',
+    animation: 150,
+    group: 'todo-dump',
+    onEnd: function(){
+      syncTodoListsFromDOM();
+      renderTodoDump();
+      renderDashTodo();
+    }
+  });
+}
+initTodoSortable('this');
+initTodoSortable('next');
+
+/* Quick-add from Dashboard, straight into the To-Do Dump */
+function quickAddTodo(){
+  const input = document.getElementById('quick-add-task');
+  const val = input.value.trim();
+  if(!val) return;
+  const tag = document.getElementById('quick-add-tag').value;
+  const week = document.getElementById('quick-add-week').value;
+  DATA.todoDump[week].push({id:uid(), tag, task:val, done:false});
+  input.value = '';
+  saveData();
+  renderDashTodo();
+  renderTodoDump();
+}
+document.getElementById('quick-add-btn').addEventListener('click', quickAddTodo);
+document.getElementById('quick-add-task').addEventListener('keydown', e=>{ if(e.key==='Enter') quickAddTodo(); });
+
+function renderDashTodo(){
+  const queue = [...DATA.todoDump.this, ...DATA.todoDump.next].filter(t=>!t.done && t.task && t.task.trim()!=='');
+  const shown = queue.slice(0,10);
+  document.getElementById('todo-count').textContent = shown.length+' / 10';
+  const el = document.getElementById('dash-todo-list');
+  let html = shown.map(t=>`
+    <div class="task-row" data-id="${t.id}">
+      <input type="checkbox">
+      <span class="tag tag-${t.tag}">${tagLabel(t.tag)}</span>
+      <div class="task-text">${escapeHTML(t.task)}</div>
+    </div>`).join('');
+  const remaining = 10 - shown.length;
+  for(let i=0;i<remaining;i++){
+    html += '<div class="empty-slot">Open slot, add more below or on the To-Do Dump page</div>';
+  }
+  if(shown.length===0 && remaining===10){
+    el.innerHTML = '<div class="empty-slot">Nothing on your list yet. Add tasks below or on the To-Do Dump page.</div>';
+  } else {
+    el.innerHTML = html;
+  }
+  el.querySelectorAll('.task-row input[type=checkbox]').forEach(cb=>{
+    cb.addEventListener('change', ()=>{
+      const id = cb.closest('.task-row').dataset.id;
+      const t = [...DATA.todoDump.this, ...DATA.todoDump.next].find(x=>x.id===id);
+      if(t){ t.done = true; saveData(); renderDashTodo(); renderTodoDump(); }
+    });
+  });
+}
+
+/* =========================================================
+   DAILY RECURRING TASKS
+   ========================================================= */
+function renderDailySetup(){
+  const container = document.getElementById('daily-setup-container');
+  container.innerHTML = '';
+  for(let d=0; d<7; d++){
+    const dayItems = DATA.dailyRecurring.filter(t=>t.day===d);
+    const wrap = document.createElement('div');
+    wrap.className = 'card';
+    wrap.style.marginBottom = '16px';
+    wrap.innerHTML = `
+      <h2>${dayName(d)} <span class="sub">${dayItems.length} task${dayItems.length!==1?'s':''}</span></h2>
+      <table class="sheet"><thead><tr><th style="width:34px;"></th><th style="width:120px;">Section</th><th>Task</th><th class="del-cell"></th></tr></thead>
+      <tbody id="daily-tbody-${d}"></tbody></table>
+      <div class="sheet-toolbar" style="margin-top:10px;margin-bottom:0;">
+        <button class="btn small secondary" data-day="${d}">+ Add task for ${dayName(d)}</button>
+      </div>
+    `;
+    container.appendChild(wrap);
+    const tbody = wrap.querySelector('#daily-tbody-'+d);
+    dayItems.forEach(t=>{
+      const tr = document.createElement('tr');
+      tr.dataset.id = t.id;
+      tr.innerHTML = `
+        <td class="drag-handle" title="Drag to reorder">⠿</td>
+        <td>
+          <select class="tag-select" style="width:100%;border:none;" data-field="section">
+            <option value="Home" ${t.section==='Home'?'selected':''}>Home</option>
+            <option value="TNF" ${t.section==='TNF'?'selected':''}>TNF</option>
+            <option value="SSBB" ${t.section==='SSBB'?'selected':''}>SSBB</option>
+            <option value="SSBB_TNF" ${t.section==='SSBB_TNF'?'selected':''}>SSBB &amp; TNF</option>
+          </select>
+        </td>
+        <td><input type="text" placeholder="Task" value="${escapeAttr(t.task||'')}" data-field="task"></td>
+        <td class="del-cell"><button class="icon-btn">✕</button></td>
+      `;
+      tr.querySelector('[data-field=section]').addEventListener('change', e=>{ t.section=e.target.value; saveData(); renderDashDaily(); });
+      tr.querySelector('[data-field=task]').addEventListener('input', e=>{ t.task=e.target.value; saveData(); renderDashDaily(); });
+      tr.querySelector('.icon-btn').addEventListener('click', ()=>{
+        DATA.dailyRecurring = DATA.dailyRecurring.filter(x=>x.id!==t.id);
+        saveData(); renderDailySetup(); renderDashDaily();
+      });
+      tbody.appendChild(tr);
+    });
+    if(typeof Sortable !== 'undefined'){
+      new Sortable(tbody, {
+        handle: '.drag-handle',
+        animation: 150,
+        onEnd: function(){
+          const newOrder = [...tbody.children].map(tr=>tr.dataset.id);
+          const reorderedDayItems = newOrder.map(id => dayItems.find(t=>t.id===id));
+          const globalIdxs = dayItems.map(t=>DATA.dailyRecurring.indexOf(t)).sort((a,b)=>a-b);
+          globalIdxs.forEach((globalIdx, i)=>{ DATA.dailyRecurring[globalIdx] = reorderedDayItems[i]; });
+          saveData(); renderDashDaily();
+        }
+      });
+    }
+    wrap.querySelector('[data-day]').addEventListener('click', ()=>{
+      DATA.dailyRecurring.push({id:uid(), day:d, section:'Home', task:''});
+      saveData(); renderDailySetup();
+    });
+  }
+}
+
+function ensureAdhocDay(dateISO){
+  if(!DATA.adhocDaily[dateISO]) DATA.adhocDaily[dateISO] = {Home:[], TNF:[], SSBB:[]};
+  return DATA.adhocDaily[dateISO];
+}
+
+function sectionMatchesColumn(taskSection, column){
+  if(taskSection === column) return true;
+  if(taskSection === 'SSBB_TNF' && (column === 'TNF' || column === 'SSBB')) return true;
+  return false;
+}
+
+function renderDashDaily(){
+  const dateObj = fromISO(DATA.selectedDate);
+  const dow = dateObj.getDay();
+  const adhocDay = ensureAdhocDay(DATA.selectedDate);
+  ['Home','TNF','SSBB'].forEach(section=>{
+    const el = document.getElementById('dt-'+section.toLowerCase());
+    const recurringItems = DATA.dailyRecurring.filter(t=>t.day===dow && sectionMatchesColumn(t.section, section) && t.task && t.task.trim()!=='');
+    const adhocItems = adhocDay[section] || [];
+
+    let html = '';
+    if(recurringItems.length===0 && adhocItems.length===0){
+      html = '<div class="dt-empty">Nothing set for this day</div>';
+    } else {
+      html += recurringItems.map(t=>{
+        const key = DATA.selectedDate+'|'+t.id;
+        const done = !!DATA.dailyCompletion[key];
+        const badge = t.section==='SSBB_TNF' ? ' <span class="tag tag-SSBB_TNF" style="margin-left:4px;">SSBB &amp; TNF</span>' : '';
+        return `<div class="dt-item ${done?'done':''}" data-key="${key}"><input type="checkbox" ${done?'checked':''}><span>${escapeHTML(t.task)}${badge}</span></div>`;
+      }).join('');
+      html += adhocItems.map(item=>{
+        return `<div class="dt-item adhoc ${item.done?'done':''}" data-adhoc-id="${item.id}"><input type="checkbox" ${item.done?'checked':''}><span>${escapeHTML(item.text)}</span><button class="icon-btn small-x" title="Delete">✕</button></div>`;
+      }).join('');
+    }
+    el.innerHTML = html;
+
+    el.querySelectorAll('.dt-item[data-key] input').forEach(cb=>{
+      cb.addEventListener('change', ()=>{
+        const key = cb.closest('.dt-item').dataset.key;
+        if(cb.checked) DATA.dailyCompletion[key] = true; else delete DATA.dailyCompletion[key];
+        saveData(); renderDashDaily();
+      });
+    });
+    el.querySelectorAll('.dt-item[data-adhoc-id]').forEach(row=>{
+      const id = row.dataset.adhocId;
+      row.querySelector('input').addEventListener('change', e=>{
+        const item = adhocDay[section].find(x=>x.id===id);
+        if(item){ item.done = e.target.checked; saveData(); renderDashDaily(); }
+      });
+      row.querySelector('.icon-btn').addEventListener('click', ()=>{
+        adhocDay[section] = adhocDay[section].filter(x=>x.id!==id);
+        saveData(); renderDashDaily();
+      });
+    });
+  });
+}
+
+['Home','TNF','SSBB'].forEach(section=>{
+  const btn = document.getElementById('dt-add-btn-'+section);
+  const input = document.getElementById('dt-add-input-'+section);
+  function addAdhocTask(){
+    const val = input.value.trim();
+    if(!val) return;
+    const day = ensureAdhocDay(DATA.selectedDate);
+    day[section].push({id:uid(), text:val, done:false});
+    input.value = '';
+    saveData();
+    renderDashDaily();
+    input.focus();
+  }
+  btn.addEventListener('click', addAdhocTask);
+  input.addEventListener('keydown', e=>{ if(e.key==='Enter') addAdhocTask(); });
+});
+
+/* =========================================================
+   MONTHLY & YEARLY TASKS
+   ========================================================= */
+const NTH_LABELS = {1:'1st',2:'2nd',3:'3rd',4:'4th',[-1]:'Last'};
+
+function renderMonthlyYearly(){
+  const tbody = document.getElementById('my-tbody');
+  tbody.innerHTML = '';
+  DATA.monthlyYearly.forEach(t=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>
+        <select data-field="type" style="width:100%;border:none;padding:10px 12px;">
+          <option value="monthly" ${t.type==='monthly'?'selected':''}>Monthly</option>
+          <option value="yearly" ${t.type==='yearly'?'selected':''}>Yearly</option>
+        </select>
+      </td>
+      <td>
+        <select data-field="month" style="width:100%;border:none;padding:10px 12px;" ${t.type==='monthly'?'disabled':''}>
+          ${Array.from({length:12},(_,i)=>`<option value="${i}" ${t.month===i?'selected':''}>${monthName(i)}</option>`).join('')}
+        </select>
+      </td>
+      <td class="my-when-cell"></td>
+      <td><input type="text" placeholder="Task" value="${escapeAttr(t.task||'')}" data-field="task"></td>
+      <td>
+        <select class="tag-select" style="width:100%;border:none;" data-field="section">
+          <option value="Home" ${t.section==='Home'?'selected':''}>Home</option>
+          <option value="TNF" ${t.section==='TNF'?'selected':''}>TNF</option>
+          <option value="SSBB" ${t.section==='SSBB'?'selected':''}>SSBB</option>
+          <option value="SSBB_TNF" ${t.section==='SSBB_TNF'?'selected':''}>SSBB &amp; TNF</option>
+        </select>
+      </td>
+      <td class="del-cell"><button class="icon-btn">✕</button></td>
+    `;
+    // when cell: rule type + day/nth+weekday
+    const whenCell = tr.querySelector('.my-when-cell');
+    whenCell.innerHTML = `
+      <div style="display:flex;gap:4px;padding:6px 8px;align-items:center;">
+        <select data-field="ruleType" style="border:1px solid var(--border);border-radius:6px;font-size:12px;padding:3px;">
+          <option value="dayOfMonth" ${t.ruleType==='dayOfMonth'?'selected':''}>Day #</option>
+          <option value="nthWeekday" ${t.ruleType==='nthWeekday'?'selected':''}>Nth Weekday</option>
+          <option value="lastWeek" ${t.ruleType==='lastWeek'?'selected':''}>Last Week of Month</option>
+        </select>
+      </div>
+      <div class="rule-detail" style="padding:0 8px 6px 8px;"></div>
+    `;
+    function renderRuleDetail(){
+      const detail = whenCell.querySelector('.rule-detail');
+      if(t.ruleType==='nthWeekday'){
+        detail.innerHTML = `
+          <select data-field="nth" style="border:1px solid var(--border);border-radius:6px;font-size:12px;padding:3px;margin-right:3px;">
+            ${[1,2,3,4,-1].map(n=>`<option value="${n}" ${t.nth===n?'selected':''}>${NTH_LABELS[n]}</option>`).join('')}
+          </select>
+          <select data-field="weekday" style="border:1px solid var(--border);border-radius:6px;font-size:12px;padding:3px;">
+            ${Array.from({length:7},(_,i)=>`<option value="${i}" ${t.weekday===i?'selected':''}>${dayName(i)}</option>`).join('')}
+          </select>
+        `;
+      } else if(t.ruleType==='lastWeek'){
+        detail.innerHTML = `<span style="font-size:11.5px;color:var(--slate);">Any day in the final 7 days of the month</span>`;
+      } else {
+        detail.innerHTML = `<input type="number" min="1" max="31" placeholder="Day (1-31)" value="${t.day||''}" data-field="day" style="width:80px;border:1px solid var(--border);border-radius:6px;font-size:12px;padding:3px 6px;">`;
+      }
+      detail.querySelectorAll('[data-field]').forEach(inp=>{
+        inp.addEventListener('change', e=>{
+          const f = inp.dataset.field;
+          t[f] = f==='day' ? Number(e.target.value) : (f==='nth' ? Number(e.target.value) : Number(e.target.value));
+          saveData(); renderDashMonthlyYearly();
+        });
+      });
+    }
+    renderRuleDetail();
+    whenCell.querySelector('[data-field=ruleType]').addEventListener('change', e=>{
+      t.ruleType = e.target.value;
+      saveData(); renderRuleDetail(); renderDashMonthlyYearly();
+    });
+
+    tr.querySelector('[data-field=type]').addEventListener('change', e=>{
+      t.type = e.target.value; saveData(); renderMonthlyYearly(); renderDashMonthlyYearly();
+    });
+    const monthSel = tr.querySelector('[data-field=month]');
+    monthSel.addEventListener('change', e=>{ t.month = Number(e.target.value); saveData(); renderDashMonthlyYearly(); });
+    tr.querySelector('[data-field=task]').addEventListener('input', e=>{ t.task = e.target.value; saveData(); renderDashMonthlyYearly(); });
+    tr.querySelector('[data-field=section]').addEventListener('change', e=>{ t.section = e.target.value; saveData(); renderDashMonthlyYearly(); });
+    tr.querySelector('.icon-btn').addEventListener('click', ()=>{
+      DATA.monthlyYearly = DATA.monthlyYearly.filter(x=>x.id!==t.id);
+      saveData(); renderMonthlyYearly(); renderDashMonthlyYearly();
+    });
+    tbody.appendChild(tr);
+  });
+}
+document.getElementById('add-my-row').addEventListener('click', ()=>{
+  DATA.monthlyYearly.push({id:uid(), type:'monthly', month:0, ruleType:'dayOfMonth', day:1, nth:1, weekday:1, task:'', section:'Home'});
+  saveData(); renderMonthlyYearly();
+});
+
+function nthWeekdayDate(year, month, nth, weekday){
+  if(nth === -1){
+    const last = new Date(year, month+1, 0);
+    const diff = (last.getDay() - weekday + 7) % 7;
+    return last.getDate() - diff;
+  }
+  const first = new Date(year, month, 1);
+  const offset = (weekday - first.getDay() + 7) % 7;
+  return 1 + offset + (nth-1)*7;
+}
+function taskMatchesDate(t, dateObj){
+  if(t.type==='yearly' && t.month !== dateObj.getMonth()) return false;
+  if(t.ruleType==='dayOfMonth'){
+    return t.day === dateObj.getDate();
+  } else {
+    const targetDay = nthWeekdayDate(dateObj.getFullYear(), dateObj.getMonth(), t.nth, t.weekday);
+    return targetDay === dateObj.getDate();
+  }
+}
+function getMonthOccurrences(year, month){
+  const items = [];
+  DATA.monthlyYearly.forEach(t=>{
+    if(!t.task || t.task.trim()==='') return;
+    if(t.type==='yearly' && t.month !== month) return;
+    if(t.ruleType==='lastWeek'){
+      const lastDay = new Date(year, month+1, 0).getDate();
+      const startDay = Math.max(1, lastDay-6);
+      items.push({id: t.id, date: new Date(year, month, lastDay), rangeLabel: monthName(month).slice(0,3)+' '+startDay+'\u2013'+lastDay, task: t.task, section: t.section, type: t.type});
+      return;
+    }
+    let day;
+    if(t.ruleType==='dayOfMonth'){
+      day = t.day;
+      if(!day || day<1) return;
+      if(day > new Date(year, month+1, 0).getDate()) return;
+    } else {
+      day = nthWeekdayDate(year, month, t.nth, t.weekday);
+    }
+    items.push({id: t.id, date: new Date(year, month, day), task: t.task, section: t.section, type: t.type});
+  });
+  items.sort((a,b)=>a.date-b.date);
+  return items;
+}
+function renderDashMonthlyYearly(){
+  const y = DATA.calViewYear, m = DATA.calViewMonth;
+  document.getElementById('dash-my-month').textContent = monthName(m);
+  const matches = getMonthOccurrences(y, m).filter(t=>{
+    const key = t.rangeLabel ? (y+'-'+pad(m+1)+'|'+t.id) : (toISO(t.date)+'|'+t.id);
+    return !DATA.monthlyCompletion[key];
+  });
+  const el = document.getElementById('dash-my-list');
+  if(matches.length===0){ el.innerHTML = '<div class="empty-slot">No monthly or yearly tasks fall in '+monthName(m)+'</div>'; return; }
+  el.innerHTML = matches.map(t=>{
+    const dateLabel = t.rangeLabel ? t.rangeLabel : monthName(t.date.getMonth()).slice(0,3)+' '+t.date.getDate();
+    const key = t.rangeLabel ? (y+'-'+pad(m+1)+'|'+t.id) : (toISO(t.date)+'|'+t.id);
+    return `<div class="my-item" data-key="${key}">
+      <input type="checkbox">
+      <span style="color:var(--slate-light);font-size:11.5px;width:52px;flex-shrink:0;">${dateLabel}</span>
+      <span class="tag tag-${t.section}">${tagLabel(t.section)}</span>
+      <span class="my-task-text">${escapeHTML(t.task)}</span>
+    </div>`;
+  }).join('');
+  el.querySelectorAll('.my-item input[type=checkbox]').forEach(cb=>{
+    cb.addEventListener('change', ()=>{
+      const key = cb.closest('.my-item').dataset.key;
+      if(cb.checked) DATA.monthlyCompletion[key] = true; else delete DATA.monthlyCompletion[key];
+      saveData(); renderDashMonthlyYearly();
+    });
+  });
+}
+
+/* =========================================================
+   MEAL PLANNING
+   ========================================================= */
+/* Shared helpers for any meal-slot dropzone (calendar cells + Big Meal panel) */
+function renderMealSlotItems(container, dateISO, slot, opts){
+  opts = opts || {};
+  const day = ensureMealDay(dateISO);
+  const items = day[slot];
+  if(items.length===0){
+    container.innerHTML = opts.emptyHTML !== undefined ? opts.emptyHTML : '';
+  } else {
+    container.innerHTML = items.map(it=>opts.itemTemplate(it)).join('');
+  }
+  container.querySelectorAll('[data-move-handle]').forEach(handle=>{
+    handle.addEventListener('dragstart', e=>{
+      const itemId = handle.dataset.itemId;
+      const item = day[slot].find(x=>x.id===itemId);
+      if(!item) return;
+      e.dataTransfer.setData('text/plain', item.text);
+      e.dataTransfer.setData('application/x-meal-move', JSON.stringify({iso:dateISO, slot, itemId}));
+      e.dataTransfer.effectAllowed = 'move';
+      e.stopPropagation();
+    });
+  });
+  container.querySelectorAll('[data-del-item]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      e.stopPropagation();
+      const itemId = btn.dataset.delItem;
+      day[slot] = day[slot].filter(x=>x.id!==itemId);
+      saveData();
+      if(opts.onChange) opts.onChange();
+    });
+  });
+}
+
+function handleMealSlotDrop(e, dateISO, slot, onChange){
+  e.preventDefault();
+  const text = e.dataTransfer.getData('text/plain');
+  if(!text || !text.trim()) return;
+  const day = ensureMealDay(dateISO);
+  const moveDataRaw = e.dataTransfer.getData('application/x-meal-move');
+  let moved = false;
+  let sourceRemoved = null;
+
+  if(moveDataRaw){
+    try{
+      const src = JSON.parse(moveDataRaw);
+      const srcDay = ensureMealDay(src.iso);
+      const idx = srcDay[src.slot].findIndex(x=>x.id===src.itemId);
+      if(idx > -1){
+        sourceRemoved = srcDay[src.slot][idx];
+        if(!(src.iso===dateISO && src.slot===slot)){
+          srcDay[src.slot].splice(idx,1);
+          moved = true;
+        }
+      }
+    }catch(err){}
+  }
+
+  if(moved && sourceRemoved){
+    day[slot].push({id: sourceRemoved.id, text: sourceRemoved.text});
+  } else if(!moveDataRaw){
+    day[slot].push({id:uid(), text});
+  }
+
+  saveData();
+  if(onChange) onChange();
+  const d = fromISO(dateISO);
+  const label = monthName(d.getMonth())+' '+d.getDate();
+  showToast((moved ? 'Moved "' : 'Added "')+text+'" to '+slot+' on '+label+'.');
+}
+
+function renderMealCal(){
+  const y = DATA.mealCalViewYear, m = DATA.mealCalViewMonth;
+  document.getElementById('meal-cal-month-label').textContent = monthName(m)+' '+y;
+  const table = document.getElementById('meal-cal-table');
+  const firstDay = new Date(y,m,1);
+  const startOffset = firstDay.getDay();
+  const daysInMonth = new Date(y,m+1,0).getDate();
+  const daysInPrevMonth = new Date(y,m,0).getDate();
+
+  let cells = [];
+  for(let i=startOffset-1;i>=0;i--) cells.push({day:daysInPrevMonth-i, otherMonth:true, y:m===0?y-1:y, m:m===0?11:m-1});
+  for(let d=1;d<=daysInMonth;d++) cells.push({day:d, otherMonth:false, y, m});
+  let next=1;
+  while(cells.length<42){ cells.push({day:next, otherMonth:true, y:m===11?y+1:y, m:m===11?0:m+1}); next++; }
+
+  function slotBlock(iso, slot, label){
+    return `<div class="meal-tag">${label}</div>
+      <div class="meal-slot-items" data-iso="${iso}" data-slot="${slot}"></div>
+      <div class="meal-slot-add"><input type="text" placeholder="+ add" data-iso="${iso}" data-slot="${slot}"></div>`;
+  }
+
+  let html = '<thead><tr>';
+  ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach(d=>html+='<th>'+d+'</th>');
+  html += '</tr></thead><tbody>';
+  for(let row=0; row<6; row++){
+    html += '<tr>';
+    for(let col=0; col<7; col++){
+      const c = cells[row*7+col];
+      const iso = c.y+'-'+pad(c.m+1)+'-'+pad(c.day);
+      html += `<td class="${c.otherMonth?'other-month':''}">
+        <div class="day-num">${c.day}</div>
+        ${slotBlock(iso,'lunch','Lunch')}
+        ${slotBlock(iso,'dinner','Dinner')}
+      </td>`;
+    }
+    html += '</tr>';
+  }
+  html += '</tbody>';
+  table.innerHTML = html;
+
+  table.querySelectorAll('.meal-slot-items').forEach(container=>{
+    const iso = container.dataset.iso, slot = container.dataset.slot;
+    renderMealSlotItems(container, iso, slot, {
+      itemTemplate: it => `<div class="meal-item-line">
+          <span class="meal-item-move" draggable="true" data-move-handle data-item-id="${it.id}" title="Drag to move">⠿</span>
+          <span class="meal-item-text">${escapeHTML(it.text)}</span>
+          <button class="meal-item-del" data-del-item="${it.id}" title="Remove">✕</button>
+        </div>`,
+      onChange: ()=>{ renderMealCal(); renderDashMeals(); renderBigMealPanel(); }
+    });
+    container.addEventListener('dragover', e=>{ e.preventDefault(); container.classList.add('drag-over'); });
+    container.addEventListener('dragleave', ()=> container.classList.remove('drag-over'));
+    container.addEventListener('drop', e=>{
+      container.classList.remove('drag-over');
+      handleMealSlotDrop(e, iso, slot, ()=>{ renderMealCal(); renderDashMeals(); renderBigMealPanel(); });
+    });
+  });
+
+  table.querySelectorAll('.meal-slot-add input').forEach(input=>{
+    function addManual(){
+      const val = input.value.trim();
+      if(!val) return;
+      const iso = input.dataset.iso, slot = input.dataset.slot;
+      const day = ensureMealDay(iso);
+      day[slot].push({id:uid(), text:val});
+      saveData();
+      renderMealCal();
+      renderDashMeals();
+      renderBigMealPanel();
+    }
+    input.addEventListener('keydown', e=>{ if(e.key==='Enter') addManual(); });
+    input.addEventListener('blur', addManual);
+  });
+}
+document.getElementById('meal-cal-prev').addEventListener('click', ()=>{
+  DATA.mealCalViewMonth--; if(DATA.mealCalViewMonth<0){DATA.mealCalViewMonth=11;DATA.mealCalViewYear--;}
+  saveData(); renderMealCal();
+});
+document.getElementById('meal-cal-next').addEventListener('click', ()=>{
+  DATA.mealCalViewMonth++; if(DATA.mealCalViewMonth>11){DATA.mealCalViewMonth=0;DATA.mealCalViewYear++;}
+  saveData(); renderMealCal();
+});
+
+function renderBigMealPanel(){
+  const dateInput = document.getElementById('bigmeal-date');
+  if(!dateInput) return; // panel not in DOM yet (e.g. before first visit to Meal Planning)
+  dateInput.value = DATA.bigMealDate || '';
+  dateInput.addEventListener('change', e=>{
+    DATA.bigMealDate = e.target.value;
+    saveData();
+    renderBigMealPanel();
+  });
+  const container = document.getElementById('bigmeal-slots');
+  if(!DATA.bigMealDate){
+    container.innerHTML = '<p style="font-size:11.5px;color:var(--slate-light);font-style:italic;">Pick a date above to start building out a big meal.</p>';
+    return;
+  }
+  const iso = DATA.bigMealDate;
+  const slots = [['dinner','Dinner'],['dessert','Dessert']];
+  container.innerHTML = slots.map(([slot,label])=>`
+    <div class="bigmeal-slot">
+      <h4>${label}</h4>
+      <div class="bigmeal-items" data-iso="${iso}" data-slot="${slot}"></div>
+      <div class="bigmeal-add-row">
+        <input type="text" placeholder="Add item">
+        <button class="btn small bigmeal-add-btn">+</button>
+      </div>
+    </div>
+  `).join('');
+
+  container.querySelectorAll('.bigmeal-items').forEach(itemsEl=>{
+    const slot = itemsEl.dataset.slot;
+    renderMealSlotItems(itemsEl, iso, slot, {
+      emptyHTML: '<div class="bigmeal-empty">Nothing added yet</div>',
+      itemTemplate: it => `<div class="bigmeal-item-row">
+          <span class="meal-item-move" draggable="true" data-move-handle data-item-id="${it.id}" title="Drag to move">⠿</span>
+          <span>${escapeHTML(it.text)}</span>
+          <button class="icon-btn small-x" data-del-item="${it.id}">✕</button>
+        </div>`,
+      onChange: ()=>{ renderBigMealPanel(); renderMealCal(); renderDashMeals(); }
+    });
+    itemsEl.addEventListener('dragover', e=>{ e.preventDefault(); itemsEl.classList.add('drag-over'); });
+    itemsEl.addEventListener('dragleave', ()=> itemsEl.classList.remove('drag-over'));
+    itemsEl.addEventListener('drop', e=>{
+      itemsEl.classList.remove('drag-over');
+      handleMealSlotDrop(e, iso, slot, ()=>{ renderBigMealPanel(); renderMealCal(); renderDashMeals(); });
+    });
+  });
+
+  container.querySelectorAll('.bigmeal-slot').forEach(slotEl=>{
+    const input = slotEl.querySelector('.bigmeal-add-row input');
+    const btn = slotEl.querySelector('.bigmeal-add-btn');
+    const slot = slotEl.querySelector('.bigmeal-items').dataset.slot;
+    function addManual(){
+      const val = input.value.trim();
+      if(!val) return;
+      const day = ensureMealDay(iso);
+      day[slot].push({id:uid(), text:val});
+      input.value = '';
+      saveData();
+      renderBigMealPanel();
+      renderMealCal();
+      renderDashMeals();
+    }
+    btn.addEventListener('click', addManual);
+    input.addEventListener('keydown', e=>{ if(e.key==='Enter') addManual(); });
+  });
+}
+
+function renderDashMeals(){
+  const day = ensureMealDay(DATA.selectedDate);
+  function fill(elId, list){
+    const el = document.getElementById(elId);
+    el.innerHTML = list.length ? list.map(it=>escapeHTML(it.text)).join('<br>') : '<span class="meal-empty">Nothing planned</span>';
+  }
+  fill('dash-lunch', day.lunch);
+  fill('dash-dinner', day.dinner);
+}
+
+function renderDashGratitude(){
+  if(!DATA.gratitude[DATA.selectedDate]) DATA.gratitude[DATA.selectedDate] = ['','','','',''];
+  const list = DATA.gratitude[DATA.selectedDate];
+  const el = document.getElementById('gratitude-list');
+  el.innerHTML = list.map((val,i)=>`
+    <div class="gratitude-row">
+      <div class="gratitude-num">${i+1}</div>
+      <input type="text" placeholder="Something you're grateful for..." value="${escapeAttr(val)}" data-i="${i}">
+    </div>`).join('');
+  el.querySelectorAll('input').forEach(inp=>{
+    inp.addEventListener('input', ()=>{
+      DATA.gratitude[DATA.selectedDate][Number(inp.dataset.i)] = inp.value;
+      saveData();
+    });
+  });
+}
+
+function renderFavMeals(){
+  const grid = document.getElementById('fav-meals-grid');
+  const boxHTML = g => `
+    <div class="fav-day" data-group="${escapeAttr(g)}">
+      <h4>${g}</h4>
+      <ul class="fav-list" data-group="${escapeAttr(g)}"></ul>
+      <div class="fav-add">
+        <input type="text" placeholder="Add a meal">
+        <button class="btn small">+</button>
+      </div>
+    </div>
+  `;
+  const bigMealHTML = `
+    <div class="bigmeal-cell">
+      <h4>Big Meal Planner</h4>
+      <p class="bigmeal-note">For the occasional big spread, Thanksgiving, Christmas, birthdays. Pick a date, drag items in from Favorites or type them by hand.</p>
+      <label class="bigmeal-date-label">Date</label>
+      <input type="date" id="bigmeal-date">
+      <div id="bigmeal-slots"></div>
+    </div>
+  `;
+  grid.innerHTML = boxHTML(FAV_MEAL_GROUPS[0]) + boxHTML(FAV_MEAL_GROUPS[1]) + bigMealHTML
+    + FAV_MEAL_GROUPS.slice(2).map(boxHTML).join('');
+
+  function findItemById(id){
+    for(const g of FAV_MEAL_GROUPS){
+      const found = (DATA.favMeals[g]||[]).find(x=>x.id===id);
+      if(found) return found;
+    }
+    return null;
+  }
+
+  function drawGroup(g){
+    const wrap = grid.querySelector(`.fav-day[data-group="${CSS.escape(g)}"]`);
+    const ul = wrap.querySelector('ul');
+    const list = DATA.favMeals[g] || [];
+    if(list.length===0){ ul.innerHTML = '<li class="fav-empty">None yet</li>'; return; }
+    ul.innerHTML = list.map(m=>`
+      <li class="fav-item" data-id="${m.id}" draggable="true" title="Drag onto a day's Lunch or Dinner box, or drag to another day group">
+        <div class="fav-item-row">
+          <span class="fav-drag-dots">⠿</span>
+          <span class="fav-item-text">${escapeHTML(m.name)}</span>
+          <button class="icon-btn small-x fav-ing-toggle" title="Ingredients">${m.ingredients && m.ingredients.length ? '🛒 '+m.ingredients.length : '+ ingr'}</button>
+          <button class="icon-btn small-x fav-del" title="Remove from favorites">✕</button>
+        </div>
+        <div class="fav-ing-panel" style="display:none;"></div>
+      </li>`).join('');
+
+    ul.querySelectorAll('.fav-item').forEach(li=>{
+      const id = li.dataset.id;
+      const item = list.find(x=>x.id===id);
+
+      li.addEventListener('dragstart', e=>{
+        e.dataTransfer.setData('text/plain', item.name);
+        e.dataTransfer.effectAllowed = 'copyMove';
+      });
+
+      li.querySelector('.fav-del').addEventListener('click', e=>{
+        e.stopPropagation();
+        DATA.favMeals[g] = DATA.favMeals[g].filter(x=>x.id!==id);
+        saveData(); drawGroup(g);
+      });
+
+      const ingToggle = li.querySelector('.fav-ing-toggle');
+      const panel = li.querySelector('.fav-ing-panel');
+      ingToggle.addEventListener('click', e=>{
+        e.stopPropagation();
+        const open = panel.style.display !== 'none';
+        panel.style.display = open ? 'none' : 'block';
+        if(!open) renderIngredientPanel(panel, item, g);
+      });
+    });
+  }
+
+  function renderIngredientPanel(panel, item, g){
+    const ingredients = item.ingredients || (item.ingredients = []);
+    const sortedCats = [...GROCERY_CATEGORIES].sort();
+    const hasAnyMaster = sortedCats.some(c => (DATA.masterIngredients[c]||[]).length>0);
+    panel.innerHTML = `
+      <div class="ing-rows"></div>
+      ${hasAnyMaster ? `
+      <div class="ing-add-row">
+        <input type="number" min="0" step="0.25" class="ing-qty-input" placeholder="Qty">
+        <select class="ing-unit-select">
+          ${MEASUREMENT_UNITS.map(u=>`<option value="${u}">${u||'\u2014'}</option>`).join('')}
+        </select>
+        <select class="ing-name-select">
+          <option value="">Choose ingredient...</option>
+          ${sortedCats.map(c=>{
+            const items = (DATA.masterIngredients[c]||[]).slice().sort((a,b)=>a.name.localeCompare(b.name));
+            if(items.length===0) return '';
+            return `<optgroup label="${escapeAttr(c)}">${items.map(m=>`<option value="${escapeAttr(m.name)}" data-cat="${escapeAttr(c)}">${escapeHTML(m.name)}</option>`).join('')}</optgroup>`;
+          }).join('')}
+        </select>
+        <button class="btn small ing-add-btn">+</button>
+      </div>
+      ` : `<div class="ing-empty">Add items to the Master Ingredients List page first, then they'll show up here to pick from.</div>`}
+    `;
+    const rowsEl = panel.querySelector('.ing-rows');
+    function drawRows(){
+      if(ingredients.length===0){ rowsEl.innerHTML = '<div class="ing-empty">No ingredients added</div>'; return; }
+      rowsEl.innerHTML = ingredients.map(ing=>`
+        <div class="ing-row ing-row-edit" data-id="${ing.id}">
+          <input type="number" min="0" step="0.25" class="ing-row-qty" value="${escapeAttr(ing.quantity||'')}" placeholder="Qty">
+          <select class="ing-row-unit">
+            ${MEASUREMENT_UNITS.map(u=>`<option value="${u}" ${ing.unit===u?'selected':''}>${u||'\u2014'}</option>`).join('')}
+          </select>
+          <select class="ing-row-name">
+            ${sortedCats.map(c=>{
+              const items = (DATA.masterIngredients[c]||[]).slice().sort((a,b)=>a.name.localeCompare(b.name));
+              if(items.length===0) return '';
+              return `<optgroup label="${escapeAttr(c)}">${items.map(m=>`<option value="${escapeAttr(m.name)}" data-cat="${escapeAttr(c)}" ${ing.name===m.name?'selected':''}>${escapeHTML(m.name)}</option>`).join('')}</optgroup>`;
+            }).join('')}
+          </select>
+          <button class="icon-btn small-x ing-del">✕</button>
+        </div>`).join('');
+      rowsEl.querySelectorAll('.ing-row-edit').forEach(row=>{
+        const id = row.dataset.id;
+        const ing = ingredients.find(x=>x.id===id);
+        row.querySelector('.ing-row-qty').addEventListener('input', e=>{
+          ing.quantity = e.target.value;
+          saveData();
+        });
+        row.querySelector('.ing-row-unit').addEventListener('change', e=>{
+          ing.unit = e.target.value;
+          saveData();
+        });
+        row.querySelector('.ing-row-name').addEventListener('change', e=>{
+          const opt = e.target.options[e.target.selectedIndex];
+          ing.name = e.target.value;
+          ing.category = opt.dataset.cat;
+          saveData();
+        });
+        row.querySelector('.ing-del').addEventListener('click', ()=>{
+          item.ingredients = ingredients.filter(x=>x.id!==id);
+          saveData();
+          renderIngredientPanel(panel, item, g);
+        });
+      });
+    }
+    drawRows();
+    const qtyInput = panel.querySelector('.ing-qty-input');
+    const unitSelect = panel.querySelector('.ing-unit-select');
+    const nameSelect = panel.querySelector('.ing-name-select');
+    const addBtn = panel.querySelector('.ing-add-btn');
+    if(addBtn){
+      function addIngredient(){
+        const selectedOption = nameSelect.options[nameSelect.selectedIndex];
+        const val = nameSelect.value;
+        if(!val) return;
+        const cat = selectedOption.dataset.cat;
+        ingredients.push({id:uid(), name:val, category:cat, quantity: qtyInput.value, unit: unitSelect.value});
+        qtyInput.value = '';
+        unitSelect.value = '';
+        nameSelect.value = '';
+        saveData();
+        drawRows();
+        const toggleBtn = panel.previousElementSibling.querySelector('.fav-ing-toggle');
+        if(toggleBtn) toggleBtn.textContent = '🛒 '+ingredients.length;
+      }
+      addBtn.addEventListener('click', addIngredient);
+    }
+  }
+
+  FAV_MEAL_GROUPS.forEach(g=>{
+    drawGroup(g);
+    const wrap = grid.querySelector(`.fav-day[data-group="${CSS.escape(g)}"]`);
+    const input = wrap.querySelector('.fav-add input');
+    const addBtn = wrap.querySelector('.fav-add .btn');
+    function addMeal(){
+      const val = input.value.trim();
+      if(!val) return;
+      if(!DATA.favMeals[g]) DATA.favMeals[g]=[];
+      DATA.favMeals[g].push({id:uid(), name:val, ingredients:[]});
+      input.value='';
+      saveData(); drawGroup(g);
+    }
+    addBtn.addEventListener('click', addMeal);
+    input.addEventListener('keydown', e=>{ if(e.key==='Enter') addMeal(); });
+  });
+
+  if(typeof Sortable !== 'undefined'){
+    FAV_MEAL_GROUPS.forEach(g=>{
+      const ul = grid.querySelector(`.fav-list[data-group="${CSS.escape(g)}"]`);
+      new Sortable(ul, {
+        handle: '.fav-drag-dots',
+        animation: 150,
+        group: 'fav-meals',
+        onEnd: function(){
+          const allLists = grid.querySelectorAll('.fav-list');
+          const rebuilt = {};
+          allLists.forEach(listEl=>{
+            const grp = listEl.dataset.group;
+            rebuilt[grp] = [...listEl.children]
+              .map(li=>li.dataset.id ? findItemById(li.dataset.id) : null)
+              .filter(Boolean);
+          });
+          DATA.favMeals = rebuilt;
+          saveData();
+        }
+      });
+    });
+  }
+}
+
+/* =========================================================
+   GROCERY LIST
+   ========================================================= */
+function renderMasterIngredients(){
+  const container = document.getElementById('master-ingredients-container');
+  const sortedCats = [...GROCERY_CATEGORIES].sort();
+  container.innerHTML = sortedCats.map(cat=>`
+    <div class="ing-master-cat" data-cat="${escapeAttr(cat)}">
+      <h3>${cat}</h3>
+      <ul class="ing-master-list"></ul>
+      <div class="ing-master-add">
+        <input type="text" placeholder="Add ingredient">
+        <button class="btn small">+</button>
+      </div>
+    </div>
+  `).join('');
+  sortedCats.forEach(cat=>{
+    const wrap = container.querySelector(`.ing-master-cat[data-cat="${CSS.escape(cat)}"]`);
+    const ul = wrap.querySelector('.ing-master-list');
+    function draw(){
+      const list = (DATA.masterIngredients[cat]||[]).slice().sort((a,b)=>a.name.localeCompare(b.name));
+      if(list.length===0){ ul.innerHTML = '<li class="ing-master-empty">None yet</li>'; return; }
+      ul.innerHTML = list.map(item=>`
+        <li data-id="${item.id}">
+          <span>${escapeHTML(item.name)}</span>
+          <button class="icon-btn small-x">✕</button>
+        </li>`).join('');
+      ul.querySelectorAll('li').forEach(li=>{
+        li.querySelector('button').addEventListener('click', ()=>{
+          DATA.masterIngredients[cat] = DATA.masterIngredients[cat].filter(x=>x.id!==li.dataset.id);
+          saveData(); draw();
+        });
+      });
+    }
+    draw();
+    const input = wrap.querySelector('.ing-master-add input');
+    const addBtn = wrap.querySelector('.ing-master-add .btn');
+    function addItem(){
+      const val = input.value.trim();
+      if(!val) return;
+      const exists = (DATA.masterIngredients[cat]||[]).some(x=>x.name.trim().toLowerCase()===val.toLowerCase());
+      if(exists){ showToast('"'+val+'" is already on this list.'); input.value=''; return; }
+      if(!DATA.masterIngredients[cat]) DATA.masterIngredients[cat] = [];
+      DATA.masterIngredients[cat].push({id:uid(), name:val});
+      input.value = '';
+      saveData(); draw();
+    }
+    addBtn.addEventListener('click', addItem);
+    input.addEventListener('keydown', e=>{ if(e.key==='Enter') addItem(); });
+  });
+}
+
+/* =========================================================
+   STOCK CHECK
+   ========================================================= */
+function renderStockList(){
+  const y = DATA.stockViewYear, m = DATA.stockViewMonth;
+  document.getElementById('stock-month-label').textContent = monthName(m)+' '+y;
+  const monthKey = y+'-'+pad(m+1);
+  const container = document.getElementById('stock-list-container');
+  const sortedCats = [...GROCERY_CATEGORIES].sort();
+
+  container.innerHTML = sortedCats.map(cat=>{
+    const items = DATA.stockItems.filter(it=>it.category===cat).sort((a,b)=>a.name.localeCompare(b.name));
+    if(items.length===0) return '';
+    return `
+      <div class="stock-cat" data-cat="${escapeAttr(cat)}">
+        <h3>${cat}</h3>
+        ${items.map(it=>{
+          const inStockKey = monthKey+'|'+it.id;
+          const inStock = !!DATA.stockInStock[inStockKey];
+          const needIt = (DATA.groceryExtras[it.category]||[]).some(x=>x.id===it.id);
+          return `<div class="stock-row" data-id="${it.id}">
+            <span class="stock-row-name">${escapeHTML(it.name)}</span>
+            <label class="stock-check"><input type="checkbox" class="stock-instock" ${inStock?'checked':''}> In Stock</label>
+            <label class="stock-check needit"><input type="checkbox" class="stock-needit" ${needIt?'checked':''}> Need It</label>
+            <button class="stock-row-del" title="Remove from list">✕</button>
+          </div>`;
+        }).join('')}
+      </div>`;
+  }).join('');
+
+  container.querySelectorAll('.stock-row').forEach(row=>{
+    const id = row.dataset.id;
+    const item = DATA.stockItems.find(x=>x.id===id);
+    if(!item) return;
+    row.querySelector('.stock-instock').addEventListener('change', e=>{
+      const key = monthKey+'|'+id;
+      if(e.target.checked) DATA.stockInStock[key] = true; else delete DATA.stockInStock[key];
+      saveData();
+    });
+    row.querySelector('.stock-needit').addEventListener('change', e=>{
+      if(!DATA.groceryExtras[item.category]) DATA.groceryExtras[item.category] = [];
+      if(e.target.checked){
+        const already = DATA.groceryExtras[item.category].some(x=>x.id===id);
+        if(!already) DATA.groceryExtras[item.category].push({id, name:item.name});
+        showToast('"'+item.name+'" added to your Grocery List.');
+      } else {
+        DATA.groceryExtras[item.category] = DATA.groceryExtras[item.category].filter(x=>x.id!==id);
+        showToast('"'+item.name+'" removed from your Grocery List.');
+      }
+      saveData();
+    });
+    row.querySelector('.stock-row-del').addEventListener('click', ()=>{
+      DATA.stockItems = DATA.stockItems.filter(x=>x.id!==id);
+      saveData();
+      renderStockList();
+    });
+  });
+
+  const catSelect = document.getElementById('stock-new-cat');
+  catSelect.innerHTML = sortedCats.map(c=>`<option value="${escapeAttr(c)}">${c}</option>`).join('');
+}
+document.getElementById('stock-prev').addEventListener('click', ()=>{
+  DATA.stockViewMonth--; if(DATA.stockViewMonth<0){DATA.stockViewMonth=11;DATA.stockViewYear--;}
+  saveData(); renderStockList();
+});
+document.getElementById('stock-next').addEventListener('click', ()=>{
+  DATA.stockViewMonth++; if(DATA.stockViewMonth>11){DATA.stockViewMonth=0;DATA.stockViewYear++;}
+  saveData(); renderStockList();
+});
+document.getElementById('stock-add-btn').addEventListener('click', ()=>{
+  const nameInput = document.getElementById('stock-new-name');
+  const catSelect = document.getElementById('stock-new-cat');
+  const val = nameInput.value.trim();
+  if(!val) return;
+  DATA.stockItems.push({id:uid(), name:val, category:catSelect.value});
+  nameInput.value = '';
+  saveData();
+  renderStockList();
+});
+document.getElementById('stock-new-name').addEventListener('keydown', e=>{
+  if(e.key==='Enter') document.getElementById('stock-add-btn').click();
+});
+
+
+function getGroceryListForMonth(year, month){
+  const nameCounts = {};
+  Object.keys(DATA.meals).forEach(dateISO=>{
+    const d = fromISO(dateISO);
+    if(d.getFullYear()!==year || d.getMonth()!==month) return;
+    const plan = DATA.meals[dateISO];
+    if(!plan) return;
+    ['lunch','dinner','dessert'].forEach(slot=>{
+      const items = Array.isArray(plan[slot]) ? plan[slot] : [];
+      items.forEach(it=>{
+        if(!it.text) return;
+        const key = it.text.trim().toLowerCase();
+        if(!key) return;
+        nameCounts[key] = (nameCounts[key]||0)+1;
+      });
+    });
+  });
+
+  const recipeLookup = {};
+  Object.values(DATA.favMeals).forEach(list=>{
+    (list||[]).forEach(item=>{
+      if(item.name) recipeLookup[item.name.trim().toLowerCase()] = item.ingredients||[];
+    });
+  });
+
+  const categoryMap = {};
+  GROCERY_CATEGORIES.forEach(c=>{ categoryMap[c] = {}; });
+
+  Object.keys(nameCounts).forEach(key=>{
+    const occurrences = nameCounts[key];
+    const ingredients = recipeLookup[key];
+    if(!ingredients || ingredients.length===0) return;
+    ingredients.forEach(ing=>{
+      const cat = GROCERY_CATEGORIES.includes(ing.category) ? ing.category : 'Personal';
+      const unit = ing.unit || '';
+      const qty = Number(ing.quantity) || 0;
+      const ikey = ing.name.trim().toLowerCase()+'|'+unit;
+      if(!categoryMap[cat][ikey]) categoryMap[cat][ikey] = {name: ing.name, unit, qty:0, count:0};
+      if(qty > 0){
+        categoryMap[cat][ikey].qty += qty * occurrences;
+      } else {
+        categoryMap[cat][ikey].count += occurrences;
+      }
+    });
+  });
+
+  return categoryMap;
+}
+
+function renderGroceryList(){
+  const y = DATA.groceryViewYear, m = DATA.groceryViewMonth;
+  const monthKey = y+'-'+pad(m+1);
+  document.getElementById('grocery-month-label').textContent = monthName(m)+' '+y;
+  const categoryMap = getGroceryListForMonth(y, m);
+  const container = document.getElementById('grocery-list-container');
+  const sortedCats = [...GROCERY_CATEGORIES].sort();
+
+  function amountLabel(it){
+    const parts = [];
+    if(it.qty > 0) parts.push(it.qty+(it.unit?' '+it.unit:''));
+    if(it.count > 0) parts.push(it.count+'x');
+    return parts.join(' + ');
+  }
+
+  container.innerHTML = sortedCats.map(cat=>{
+    const items = Object.values(categoryMap[cat]||{}).sort((a,b)=>a.name.localeCompare(b.name));
+    const extras = DATA.groceryExtras[cat] || [];
+    return `
+      <div class="grocery-cat" data-cat="${escapeAttr(cat)}">
+        <h3>${cat}</h3>
+        <div class="grocery-items">
+          ${items.length===0 && extras.length===0 ? '<div class="grocery-empty">Nothing needed</div>' : ''}
+          ${items.map(it=>{
+            const key = monthKey+'|'+cat+'|'+it.name.trim().toLowerCase()+'|'+(it.unit||'');
+            const done = !!DATA.groceryCompletion[key];
+            const amt = amountLabel(it);
+            return `<div class="grocery-item ${done?'done':''}" data-key="${escapeAttr(key)}">
+              <input type="checkbox" ${done?'checked':''}>
+              ${amt ? '<span class="grocery-count">'+amt+'</span> ' : ''}<span class="grocery-item-name">${escapeHTML(it.name)}</span>
+            </div>`;
+          }).join('')}
+          ${extras.map(ex=>{
+            const key = monthKey+'|'+cat+'|extra:'+ex.id;
+            const done = !!DATA.groceryCompletion[key];
+            return `<div class="grocery-item grocery-extra ${done?'done':''}" data-key="${escapeAttr(key)}" data-id="${ex.id}">
+              <input type="checkbox" ${done?'checked':''}>
+              <span class="grocery-item-name">${escapeHTML(ex.name)}</span>
+              <button class="icon-btn small-x grocery-extra-del">✕</button>
+            </div>`;
+          }).join('')}
+        </div>
+        <div class="grocery-add-row">
+          <input type="text" placeholder="Add extra item" class="grocery-extra-input">
+          <button class="btn small grocery-extra-add">+</button>
+        </div>
+      </div>`;
+  }).join('');
+
+  container.querySelectorAll('.grocery-item input[type=checkbox]').forEach(cb=>{
+    cb.addEventListener('change', ()=>{
+      const key = cb.closest('.grocery-item').dataset.key;
+      if(cb.checked) DATA.groceryCompletion[key] = true; else delete DATA.groceryCompletion[key];
+      saveData(); renderGroceryList();
+    });
+  });
+
+  sortedCats.forEach(cat=>{
+    const wrap = container.querySelector(`.grocery-cat[data-cat="${CSS.escape(cat)}"]`);
+    wrap.querySelectorAll('.grocery-extra-del').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const id = btn.closest('.grocery-extra').dataset.id;
+        DATA.groceryExtras[cat] = (DATA.groceryExtras[cat]||[]).filter(x=>x.id!==id);
+        saveData(); renderGroceryList();
+      });
+    });
+    const input = wrap.querySelector('.grocery-extra-input');
+    const addBtn = wrap.querySelector('.grocery-extra-add');
+    function addExtra(){
+      const val = input.value.trim();
+      if(!val) return;
+      if(!DATA.groceryExtras[cat]) DATA.groceryExtras[cat] = [];
+      DATA.groceryExtras[cat].push({id:uid(), name:val});
+      input.value = '';
+      saveData(); renderGroceryList();
+    }
+    addBtn.addEventListener('click', addExtra);
+    input.addEventListener('keydown', e=>{ if(e.key==='Enter') addExtra(); });
+  });
+}
+document.getElementById('grocery-prev').addEventListener('click', ()=>{
+  DATA.groceryViewMonth--; if(DATA.groceryViewMonth<0){DATA.groceryViewMonth=11;DATA.groceryViewYear--;}
+  saveData(); renderGroceryList();
+});
+document.getElementById('grocery-next').addEventListener('click', ()=>{
+  DATA.groceryViewMonth++; if(DATA.groceryViewMonth>11){DATA.groceryViewMonth=0;DATA.groceryViewYear++;}
+  saveData(); renderGroceryList();
+});
+document.getElementById('print-grocery-btn').addEventListener('click', ()=>{
+  window.print();
+});
+document.getElementById('clear-grocery-btn').addEventListener('click', ()=>{
+  showConfirm('Clear this month\'s checked-off boxes and remove all extra items you\'ve added across every category? This cannot be undone.', ()=>{
+    const y = DATA.groceryViewYear, m = DATA.groceryViewMonth;
+    const monthKey = y+'-'+pad(m+1)+'|';
+    Object.keys(DATA.groceryCompletion).forEach(key=>{
+      if(key.startsWith(monthKey)) delete DATA.groceryCompletion[key];
+    });
+    DATA.groceryExtras = {};
+    saveData();
+    renderGroceryList();
+    showToast('Grocery list cleared.');
+  });
+});
+
+/* =========================================================
+   GENERAL NOTES (free spreadsheet)
+   ========================================================= */
+function renderNotes(){
+  const theadRow = document.getElementById('notes-thead-row');
+  theadRow.innerHTML = DATA.notesCols.map((c,i)=>`<th><input type="text" value="${escapeAttr(c)}" data-col="${i}" style="background:transparent;border:none;color:#fff;font-weight:600;width:100%;padding:0;font-size:11.5px;text-transform:uppercase;letter-spacing:0.5px;"></th>`).join('') + '<th class="del-cell"></th>';
+  theadRow.querySelectorAll('input').forEach(inp=>{
+    inp.addEventListener('input', ()=>{
+      DATA.notesCols[Number(inp.dataset.col)] = inp.value;
+      saveData();
+    });
+  });
+
+  const tbody = document.getElementById('notes-tbody');
+  tbody.innerHTML = '';
+  DATA.notesRows.forEach(row=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = DATA.notesCols.map((c,i)=>`<td><input type="text" value="${escapeAttr(row.cells[i]||'')}" data-i="${i}"></td>`).join('') + '<td class="del-cell"><button class="icon-btn">✕</button></td>';
+    tr.querySelectorAll('input').forEach(inp=>{
+      inp.addEventListener('input', ()=>{
+        row.cells[Number(inp.dataset.i)] = inp.value;
+        saveData();
+      });
+    });
+    tr.querySelector('.icon-btn').addEventListener('click', ()=>{
+      DATA.notesRows = DATA.notesRows.filter(r=>r.id!==row.id);
+      saveData(); renderNotes();
+    });
+    tbody.appendChild(tr);
+  });
+}
+document.getElementById('add-note-row').addEventListener('click', ()=>{
+  DATA.notesRows.push({id:uid(), cells: DATA.notesCols.map(()=> '')});
+  saveData(); renderNotes();
+});
+document.getElementById('add-note-col').addEventListener('click', ()=>{
+  DATA.notesCols.push('New Column');
+  DATA.notesRows.forEach(r=>r.cells.push(''));
+  saveData(); renderNotes();
+});
+
+/* =========================================================
+   CONTENT CHECKLIST
+   ========================================================= */
+const CHECKLIST_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan'];
+
+function renderChecklist(){
+  renderOneTimeChecklist();
+  renderGridChecklist('checklist-tnf-thead','checklist-tnf-tbody', DATA.contentChecklist.tnfGrid);
+  renderGridChecklist('checklist-ssbb-thead','checklist-ssbb-tbody', DATA.contentChecklist.ssbbGrid);
+}
+
+function renderOneTimeChecklist(){
+  const tbody = document.getElementById('checklist-onetime-tbody');
+  tbody.innerHTML = '';
+  DATA.contentChecklist.oneTime.forEach(item=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><input type="text" value="${escapeAttr(item.label||'')}" data-field="label"></td>
+      <td class="chk-cell"><input type="checkbox" ${item.checked?'checked':''} data-field="checked"></td>
+      <td class="del-cell"><button class="icon-btn">✕</button></td>
+    `;
+    tr.querySelector('[data-field=label]').addEventListener('input', e=>{ item.label = e.target.value; saveData(); });
+    tr.querySelector('[data-field=checked]').addEventListener('change', e=>{ item.checked = e.target.checked; saveData(); });
+    tr.querySelector('.icon-btn').addEventListener('click', ()=>{
+      DATA.contentChecklist.oneTime = DATA.contentChecklist.oneTime.filter(x=>x.id!==item.id);
+      saveData(); renderOneTimeChecklist();
+    });
+    tbody.appendChild(tr);
+  });
+}
+document.getElementById('add-onetime-row').addEventListener('click', ()=>{
+  DATA.contentChecklist.oneTime.push({id:uid(), label:'', checked:false});
+  saveData(); renderOneTimeChecklist();
+});
+
+function renderGridChecklist(theadId, tbodyId, arr){
+  const thead = document.getElementById(theadId);
+  thead.innerHTML = '<th>Category</th>' + CHECKLIST_MONTHS.map(m=>`<th>${m}</th>`).join('') + '<th class="del-cell"></th>';
+
+  const tbody = document.getElementById(tbodyId);
+  tbody.innerHTML = '';
+  arr.forEach(row=>{
+    const tr = document.createElement('tr');
+    let cells = `<td><input type="text" value="${escapeAttr(row.label||'')}" data-field="label"></td>`;
+    for(let i=0;i<13;i++){
+      cells += `<td><input type="checkbox" ${row.months[i]?'checked':''} data-month="${i}"></td>`;
+    }
+    cells += `<td class="del-cell"><button class="icon-btn">✕</button></td>`;
+    tr.innerHTML = cells;
+    tr.querySelector('[data-field=label]').addEventListener('input', e=>{ row.label = e.target.value; saveData(); });
+    tr.querySelectorAll('[data-month]').forEach(cb=>{
+      cb.addEventListener('change', e=>{
+        row.months[Number(cb.dataset.month)] = e.target.checked;
+        saveData();
+      });
+    });
+    tr.querySelector('.icon-btn').addEventListener('click', ()=>{
+      const idx = arr.indexOf(row);
+      arr.splice(idx,1);
+      saveData(); renderChecklist();
+    });
+    tbody.appendChild(tr);
+  });
+}
+document.getElementById('add-tnf-grid-row').addEventListener('click', ()=>{
+  DATA.contentChecklist.tnfGrid.push({id:uid(), label:'', months:Array(13).fill(false)});
+  saveData(); renderChecklist();
+});
+document.getElementById('add-ssbb-grid-row').addEventListener('click', ()=>{
+  DATA.contentChecklist.ssbbGrid.push({id:uid(), label:'', months:Array(13).fill(false)});
+  saveData(); renderChecklist();
+});
+function showConfirm(message, onConfirm){
+  const modal = document.getElementById('confirm-modal');
+  document.getElementById('confirm-modal-text').textContent = message;
+  const okBtn = document.getElementById('confirm-modal-ok');
+  const cancelBtn = document.getElementById('confirm-modal-cancel');
+  modal.classList.add('show');
+  function cleanup(){
+    modal.classList.remove('show');
+    okBtn.removeEventListener('click', onOk);
+    cancelBtn.removeEventListener('click', onCancel);
+    modal.removeEventListener('click', onOverlayClick);
+  }
+  function onOk(){ cleanup(); onConfirm(); }
+  function onCancel(){ cleanup(); }
+  function onOverlayClick(e){ if(e.target === modal) cleanup(); }
+  okBtn.addEventListener('click', onOk);
+  cancelBtn.addEventListener('click', onCancel);
+  modal.addEventListener('click', onOverlayClick);
+}
+
+document.getElementById('clear-checklist-btn').addEventListener('click', ()=>{
+  showConfirm('Clear every checked box on this page? Your categories will stay, just the checkmarks will reset.', ()=>{
+    DATA.contentChecklist.oneTime.forEach(i=>i.checked=false);
+    DATA.contentChecklist.tnfGrid.forEach(r=>r.months=Array(13).fill(false));
+    DATA.contentChecklist.ssbbGrid.forEach(r=>r.months=Array(13).fill(false));
+    saveData();
+    renderChecklist();
+  });
+});
+
+/* =========================================================
+   UTIL
+   ========================================================= */
+function tagLabel(val){
+  return val === 'SSBB_TNF' ? 'SSBB & TNF' : val;
+}
+function escapeHTML(str){
+  return (str||'').replace(/[&<>"']/g, s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
+}
+function escapeAttr(str){ return escapeHTML(str); }
+
+/* =========================================================
+   MASTER RENDER
+   ========================================================= */
+function renderDashboard(){
+  const dateObj = fromISO(DATA.selectedDate);
+  renderDashHeader(dateObj);
+  renderScripture(dateObj);
+  renderCalendar();
+  renderDashEvents();
+  renderDashTodo();
+  renderDashDaily();
+  renderDashMonthlyYearly();
+  renderDashMeals();
+  renderDashGratitude();
+}
+
+// initial render
+renderDashboard();
+</script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch(err => console.error('SW registration failed:', err));
+    });
+  }
+</script>
+</body>
+</html>
