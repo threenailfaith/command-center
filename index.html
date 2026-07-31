@@ -168,6 +168,14 @@
   /* Meals */
   .meal-block{display:flex;gap:14px;}
   .gratitude-list{display:flex;flex-direction:column;gap:8px;}
+  .water-tracker{display:flex;flex-direction:column;align-items:center;gap:12px;}
+  .water-count-row{display:flex;align-items:center;gap:16px;}
+  .water-btn{width:34px;height:34px;border-radius:50%;border:1px solid var(--border);background:#fff;color:var(--navy);font-size:18px;font-weight:700;line-height:1;cursor:pointer;}
+  .water-btn:hover{background:var(--lavender);}
+  .water-count-display{font-size:16px;font-weight:700;color:var(--navy);min-width:110px;text-align:center;}
+  .water-drops{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;font-size:20px;line-height:1;}
+  .water-drop{opacity:0.25;filter:grayscale(1);transition:all .15s ease;}
+  .water-drop.filled{opacity:1;filter:none;}
   .gratitude-row{display:flex;align-items:center;gap:8px;}
   .gratitude-num{width:18px;height:18px;border-radius:50%;background:var(--lavender);color:var(--purple);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
   .gratitude-row input{flex:1;border:none;border-bottom:1px solid var(--border);padding:4px 2px;font-size:13.5px;color:var(--navy);background:transparent;}
@@ -473,6 +481,18 @@
           </div>
 
           <div class="card">
+            <h2>Water Tracker</h2>
+            <div class="water-tracker">
+              <div class="water-count-row">
+                <button class="water-btn" id="water-minus">−</button>
+                <div class="water-count-display"><span id="water-count-num">0</span> / 8 glasses</div>
+                <button class="water-btn" id="water-plus">+</button>
+              </div>
+              <div class="water-drops" id="water-drops"></div>
+            </div>
+          </div>
+
+          <div class="card">
             <h2>Today I'm Grateful For</h2>
             <div class="gratitude-list" id="gratitude-list"></div>
           </div>
@@ -757,6 +777,8 @@ const DEFAULT_DATA = {
   monthlyYearly: [], // {id, type:'monthly'|'yearly', month(0-11, null for monthly), ruleType:'dayOfMonth'|'nthWeekday', day, nth, weekday, task, section}
   meals: {}, // 'YYYY-MM-DD': {lunch:[{id,text}], dinner:[{id,text}], dessert:[{id,text}]}
   gratitude: {}, // 'YYYY-MM-DD': ['','','','','']
+  water: {}, // 'YYYY-MM-DD': count
+  waterGoal: 8,
   favMeals: { 'Saturday / Sunday':[], 'Monday':[], 'Tuesday / Thursday':[], 'Wednesday':[], 'Friday':[], 'Sometimes':[], 'Smoked':[], 'Winter / Crockpot':[] },
   groceryExtras: {}, // category -> [{id, name}]
   groceryCompletion: {}, // key: 'year-month|category|itemname|unit' -> true
@@ -2127,6 +2149,28 @@ function renderDashMeals(){
   fill('dash-dinner', day.dinner);
 }
 
+function renderDashWater(){
+  const goal = DATA.waterGoal || 8;
+  const count = DATA.water[DATA.selectedDate] || 0;
+  document.getElementById('water-count-num').textContent = count;
+  const dropsEl = document.getElementById('water-drops');
+  let html = '';
+  for(let i=0;i<goal;i++){
+    html += `<span class="water-drop ${i<count?'filled':''}">\u{1F4A7}</span>`;
+  }
+  dropsEl.innerHTML = html;
+}
+document.getElementById('water-plus').addEventListener('click', ()=>{
+  DATA.water[DATA.selectedDate] = (DATA.water[DATA.selectedDate]||0) + 1;
+  saveData();
+  renderDashWater();
+});
+document.getElementById('water-minus').addEventListener('click', ()=>{
+  DATA.water[DATA.selectedDate] = Math.max(0, (DATA.water[DATA.selectedDate]||0) - 1);
+  saveData();
+  renderDashWater();
+});
+
 function renderDashGratitude(){
   if(!DATA.gratitude[DATA.selectedDate]) DATA.gratitude[DATA.selectedDate] = ['','','','',''];
   const list = DATA.gratitude[DATA.selectedDate];
@@ -2806,6 +2850,7 @@ function renderDashboard(){
   renderDashDaily();
   renderDashMonthlyYearly();
   renderDashMeals();
+  renderDashWater();
   renderDashGratitude();
 }
 
