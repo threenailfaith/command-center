@@ -7,6 +7,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#6b4478">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -329,6 +332,23 @@
 
   ::placeholder{color:var(--slate-light);}
 
+  .auth-screen{
+    position:fixed;inset:0;background:linear-gradient(135deg, var(--navy), #4a2e58);
+    display:flex;align-items:center;justify-content:center;z-index:2000;
+  }
+  .auth-box{background:#fff;border-radius:16px;padding:36px 32px;max-width:340px;width:90%;box-shadow:var(--shadow-lg);text-align:center;}
+  .auth-brand{font-family:'Lora',serif;font-size:24px;font-weight:600;color:var(--navy);margin-bottom:6px;}
+  .auth-sub{font-size:13px;color:var(--slate);margin:0 0 20px 0;line-height:1.5;}
+  .auth-box input{width:100%;border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:14px;margin-bottom:10px;}
+  .auth-box .btn{width:100%;margin-bottom:8px;padding:10px;}
+  .auth-error{color:var(--danger);font-size:12.5px;margin-bottom:10px;min-height:16px;}
+  .auth-loading{font-size:12.5px;color:var(--slate);margin-top:10px;}
+  #sync-status{display:flex;align-items:center;gap:5px;}
+  .sync-dot{width:7px;height:7px;border-radius:50%;background:var(--slate-light);flex-shrink:0;display:inline-block;}
+  .sync-dot.synced{background:#5fae6f;}
+  .sync-dot.syncing{background:var(--gold);}
+  .sync-dot.offline{background:var(--danger);}
+
   .modal-overlay{
     display:none;position:fixed;inset:0;background:rgba(49,30,58,0.45);
     align-items:center;justify-content:center;z-index:1000;
@@ -380,6 +400,19 @@
 </head>
 <body>
 
+<div class="auth-screen" id="auth-screen">
+  <div class="auth-box">
+    <div class="auth-brand">Command Center</div>
+    <p class="auth-sub">Sign in to sync your data across your devices.</p>
+    <input type="email" id="auth-email" placeholder="Email" autocomplete="username">
+    <input type="password" id="auth-password" placeholder="Password" autocomplete="current-password">
+    <div class="auth-error" id="auth-error"></div>
+    <button class="btn" id="auth-signin-btn">Sign In</button>
+    <button class="btn secondary" id="auth-signup-btn">Create Account</button>
+    <div class="auth-loading" id="auth-loading" style="display:none;">Loading your data...</div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="confirm-modal">
   <div class="modal-box">
     <p id="confirm-modal-text"></p>
@@ -390,7 +423,7 @@
   </div>
 </div>
 
-<div class="app">
+<div class="app" id="main-app" style="display:none;">
   <div class="nav">
     <div class="nav-brand">Command Center<span>Daily Overview</span></div>
     <div class="nav-item active" data-page="dashboard">Dashboard</div>
@@ -405,10 +438,11 @@
     <div class="nav-item" data-page="checklist">Content Checklist</div>
     <div class="nav-item" data-page="notes">General Notes</div>
     <div class="nav-foot">
-      Everything here saves automatically to this browser.
+      <div id="sync-status">Everything here saves automatically to this browser.</div>
       <div class="backup-buttons">
         <button id="export-data-btn" class="nav-backup-btn">⬇ Export Backup</button>
         <button id="import-data-btn" class="nav-backup-btn">⬆ Import Backup</button>
+        <button id="signout-btn" class="nav-backup-btn">Sign Out</button>
         <input type="file" id="import-file-input" accept="application/json" style="display:none;">
       </div>
     </div>
@@ -739,6 +773,12 @@
    ========================================================= */
 const STORE_KEY = 'tnf_command_center_v1';
 
+// Cloud sync state - declared early since saveData() (called during initial seeding/migration
+// below) references these before the Firebase init block further down ever runs.
+let fbAuth = null, fbDb = null, currentUID = null, cloudSyncReady = false;
+let cloudSaveTimer = null;
+let applyingRemoteUpdate = false;
+
 function uid(){ return Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4); }
 function pad(n){ return n.toString().padStart(2,'0'); }
 function toISO(d){ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
@@ -937,7 +977,162 @@ function saveData(){
   }catch(e){
     console.error('Save error', e);
   }
+  queueCloudSave();
 }
+
+/* =========================================================
+   FIREBASE AUTH + CLOUD SYNC
+   ========================================================= */
+const firebaseConfig = {
+  apiKey: "AIzaSyB3xIDGSvot5BL18syAahery7aXK4CcMgM",
+  authDomain: "command-center-reid.firebaseapp.com",
+  projectId: "command-center-reid",
+  storageBucket: "command-center-reid.firebasestorage.app",
+  messagingSenderId: "1008532466136",
+  appId: "1:1008532466136:web:0aee6886c6cf54937baaad"
+};
+
+try{
+  if(typeof firebase !== 'undefined'){
+    firebase.initializeApp(firebaseConfig);
+    fbAuth = firebase.auth();
+    fbDb = firebase.firestore();
+    fbDb.enablePersistence({synchronizeTabs:true}).catch(()=>{ /* fine if already enabled or multiple tabs */ });
+  }
+}catch(e){
+  console.error('Firebase init failed', e);
+}
+
+function setSyncStatus(state, text){
+  const el = document.getElementById('sync-status');
+  if(!el) return;
+  const dotClass = state==='synced' ? 'synced' : state==='syncing' ? 'syncing' : state==='offline' ? 'offline' : '';
+  el.innerHTML = '<span class="sync-dot '+dotClass+'"></span>'+text;
+}
+
+function queueCloudSave(){
+  if(!cloudSyncReady || !currentUID || applyingRemoteUpdate) return;
+  setSyncStatus('syncing', 'Saving...');
+  clearTimeout(cloudSaveTimer);
+  cloudSaveTimer = setTimeout(()=>{
+    fbDb.collection('users').doc(currentUID).set({
+      data: JSON.stringify(DATA),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }).then(()=>{
+      setSyncStatus('synced', 'Synced across your devices');
+    }).catch(err=>{
+      console.error('Cloud save failed', err);
+      setSyncStatus('offline', 'Saved on this device, will sync when back online');
+    });
+  }, 900);
+}
+
+function startCloudSync(uid){
+  currentUID = uid;
+  const docRef = fbDb.collection('users').doc(uid);
+  docRef.get().then(snap=>{
+    if(snap.exists && snap.data().data){
+      try{
+        const remote = JSON.parse(snap.data().data);
+        DATA = Object.assign(JSON.parse(JSON.stringify(DEFAULT_DATA)), remote);
+        migrateFavMeals(); migrateMealsToArrays(); migrateAdhocDaily(); migrateIngredientsAndMasterList();
+        seedHolidaysIfNeeded(); seedStockItemsIfNeeded();
+      }catch(e){ console.error('Could not parse cloud data', e); }
+    } else {
+      // first time this account has synced: push whatever is already on this device up
+      docRef.set({ data: JSON.stringify(DATA), updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+    }
+    (function resetToToday(){
+      const todayISO = toISO(new Date());
+      DATA.selectedDate = todayISO;
+      const d = new Date();
+      DATA.calViewYear = d.getFullYear();
+      DATA.calViewMonth = d.getMonth();
+    })();
+    cloudSyncReady = true;
+    document.getElementById('auth-loading').style.display = 'none';
+    document.getElementById('auth-screen').style.display = 'none';
+    document.getElementById('main-app').style.display = 'flex';
+    renderDashboard();
+    setSyncStatus('synced', 'Synced across your devices');
+
+    // Listen for changes from other devices
+    docRef.onSnapshot(snap=>{
+      if(!snap.exists) return;
+      if(snap.metadata.hasPendingWrites) return; // this is our own write echoing back, ignore
+      try{
+        const remote = JSON.parse(snap.data().data);
+        applyingRemoteUpdate = true;
+        DATA = Object.assign(JSON.parse(JSON.stringify(DEFAULT_DATA)), remote);
+        migrateFavMeals(); migrateMealsToArrays(); migrateAdhocDaily(); migrateIngredientsAndMasterList();
+        seedHolidaysIfNeeded(); seedStockItemsIfNeeded();
+        localStorage.setItem(STORE_KEY, JSON.stringify(DATA));
+        renderDashboard();
+        setSyncStatus('synced', 'Updated from another device');
+        applyingRemoteUpdate = false;
+      }catch(e){ console.error('Could not apply remote update', e); }
+    });
+  }).catch(err=>{
+    console.error('Initial cloud load failed', err);
+    setSyncStatus('offline', 'Working offline, will sync when reconnected');
+    document.getElementById('auth-loading').style.display = 'none';
+    document.getElementById('auth-screen').style.display = 'none';
+    document.getElementById('main-app').style.display = 'flex';
+    cloudSyncReady = true;
+    renderDashboard();
+  });
+}
+
+if(fbAuth){
+  fbAuth.onAuthStateChanged(user=>{
+    if(user){
+      document.getElementById('auth-loading').style.display = 'block';
+      startCloudSync(user.uid);
+    } else {
+      cloudSyncReady = false;
+      currentUID = null;
+      document.getElementById('auth-screen').style.display = 'flex';
+      document.getElementById('main-app').style.display = 'none';
+    }
+  });
+} else {
+  // Firebase failed to load entirely (blocked script, offline on very first ever load, etc.)
+  // Don't leave the person stuck on a broken sign-in screen, fall back to local-only mode.
+  // (No renderDashboard() call here - the script's own unconditional call at the very
+  // end handles the first render, once everything below this point has finished loading.)
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('main-app').style.display = 'flex';
+  cloudSyncReady = false;
+  setSyncStatus('offline', 'Cloud sync unavailable right now, saving to this device only');
+}
+
+function showAuthError(msg){
+  document.getElementById('auth-error').textContent = msg;
+}
+document.getElementById('auth-signin-btn').addEventListener('click', ()=>{
+  const email = document.getElementById('auth-email').value.trim();
+  const pw = document.getElementById('auth-password').value;
+  if(!email || !pw){ showAuthError('Enter your email and password.'); return; }
+  showAuthError('');
+  fbAuth.signInWithEmailAndPassword(email, pw).catch(err=>{
+    showAuthError(err.message.replace('Firebase: ',''));
+  });
+});
+document.getElementById('auth-signup-btn').addEventListener('click', ()=>{
+  const email = document.getElementById('auth-email').value.trim();
+  const pw = document.getElementById('auth-password').value;
+  if(!email || !pw){ showAuthError('Enter an email and password to create an account.'); return; }
+  if(pw.length < 6){ showAuthError('Password should be at least 6 characters.'); return; }
+  showAuthError('');
+  fbAuth.createUserWithEmailAndPassword(email, pw).catch(err=>{
+    showAuthError(err.message.replace('Firebase: ',''));
+  });
+});
+document.getElementById('signout-btn').addEventListener('click', ()=>{
+  showConfirm('Sign out of Command Center on this device?', ()=>{
+    fbAuth.signOut();
+  });
+});
 
 /* =========================================================
    TOAST NOTICES
