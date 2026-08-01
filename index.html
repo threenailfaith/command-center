@@ -1069,8 +1069,12 @@ function startCloudSync(uid){
         localStorage.setItem(STORE_KEY, JSON.stringify(DATA));
         renderDashboard();
         setSyncStatus('synced', 'Updated from another device');
+      }catch(e){
+        console.error('Could not apply remote update', e);
+        setSyncStatus('offline', 'Had trouble applying an update, your changes are still safe');
+      }finally{
         applyingRemoteUpdate = false;
-      }catch(e){ console.error('Could not apply remote update', e); }
+      }
     });
   }).catch(err=>{
     console.error('Initial cloud load failed', err);
