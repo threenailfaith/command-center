@@ -235,6 +235,18 @@
   .bigmeal-cell h4{margin:0 0 6px 0;font-size:12.5px;text-transform:uppercase;letter-spacing:0.4px;color:var(--purple);font-weight:700;}
   .bigmeal-note{font-size:11px;color:var(--slate);line-height:1.4;margin:0 0 8px 0;}
   .bigmeal-date-label{font-size:10.5px;text-transform:uppercase;letter-spacing:0.5px;color:var(--slate);font-weight:700;display:block;margin-bottom:3px;}
+
+  .sp-plan-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:14px;}
+  .sp-plan-header{display:flex;align-items:center;justify-content:space-between;cursor:pointer;}
+  .sp-plan-title{font-family:'Lora',serif;font-size:16px;font-weight:600;color:var(--navy);}
+  .sp-plan-meta{font-size:11.5px;color:var(--slate);margin-top:2px;}
+  .sp-plan-actions{display:flex;gap:8px;align-items:center;}
+  .sp-plan-days{margin-top:14px;display:none;}
+  .sp-plan-days.open{display:block;}
+  .sp-day-row{display:grid;grid-template-columns:34px 1fr 1.4fr;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);}
+  .sp-day-row:last-child{border-bottom:none;}
+  .sp-day-num{font-size:11.5px;color:var(--slate-light);font-weight:700;text-align:right;}
+  .sp-day-row input{border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;width:100%;}
   #bigmeal-date{width:100%;border:1px solid var(--border);border-radius:7px;padding:6px 8px;font-size:12.5px;margin-bottom:10px;}
   .bigmeal-slot{margin-bottom:12px;}
   .bigmeal-slot h4{margin:0 0 5px 0;font-size:10.5px;text-transform:uppercase;letter-spacing:0.5px;color:var(--purple);font-weight:700;}
@@ -436,6 +448,7 @@
     <div class="nav-item" data-page="ingredients">Master Ingredients</div>
     <div class="nav-item" data-page="stock">Stock Check</div>
     <div class="nav-item" data-page="checklist">Content Checklist</div>
+    <div class="nav-item" data-page="scriptureplans">Scripture Plans</div>
     <div class="nav-item" data-page="notes">General Notes</div>
     <div class="nav-foot">
       <div id="sync-status">Everything here saves automatically to this browser.</div>
@@ -749,6 +762,51 @@
       </div>
     </div>
 
+    <!-- ================= SCRIPTURE PLANS ================= -->
+    <div class="page" id="page-scriptureplans">
+      <div class="page-head">
+        <h1>Scripture Plans</h1>
+        <p style="font-size:13px;color:var(--slate);margin-top:-6px;">Build a month of scripture references and affirmations once, from your PDF plan, then assign it to a calendar month, every day fills in automatically on the Dashboard. Verse text is left blank for you to paste in from your own Bible app.</p>
+      </div>
+
+      <div class="section-divider"><span>Your Plans</span><div class="line"></div></div>
+      <div id="scripture-plans-list"></div>
+
+      <div class="card" style="margin-top:16px;">
+        <h2>+ Add a New Plan</h2>
+        <label class="bigmeal-date-label">Plan Title</label>
+        <input type="text" id="sp-new-title" placeholder="e.g. Trusting God's Timing" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13.5px;margin-bottom:14px;">
+        <div class="two-col">
+          <div>
+            <label class="bigmeal-date-label">Paste Scripture References (1 per line, numbered like your PDF)</label>
+            <textarea id="sp-new-refs" rows="10" placeholder="1.Isaiah 40:31&#10;2.Philippians 4:13&#10;3.2 Corinthians 12:9..." style="width:100%;border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:12.5px;font-family:monospace;"></textarea>
+          </div>
+          <div>
+            <label class="bigmeal-date-label">Paste Affirmations (1 per line, numbered like your PDF)</label>
+            <textarea id="sp-new-affs" rows="10" placeholder="1.God renews my strength every single day.&#10;2.I can do all things..." style="width:100%;border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:12.5px;font-family:monospace;"></textarea>
+          </div>
+        </div>
+        <button class="btn" id="sp-create-btn" style="margin-top:14px;">Create Plan</button>
+        <div class="auth-error" id="sp-create-error" style="text-align:left;"></div>
+      </div>
+
+      <div class="section-divider"><span>Assign a Plan to a Month</span><div class="line"></div></div>
+      <div class="card">
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
+          <div>
+            <label class="bigmeal-date-label">Month</label>
+            <input type="month" id="sp-assign-month">
+          </div>
+          <div style="flex:1;min-width:180px;">
+            <label class="bigmeal-date-label">Plan</label>
+            <select id="sp-assign-plan" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:9px 10px;font-size:13.5px;background:#fff;"></select>
+          </div>
+          <button class="btn" id="sp-assign-btn">Apply This Plan</button>
+        </div>
+        <p style="font-size:12px;color:var(--slate);margin:10px 0 0 0;">This fills in the reference and affirmation for every day of that month on the Dashboard. If a day already has something typed in, this will replace the reference and affirmation there, but never touches whatever you've written in the verse text box.</p>
+      </div>
+    </div>
+
     <!-- ================= GENERAL NOTES ================= -->
     <div class="page" id="page-notes">
       <div class="page-head">
@@ -804,6 +862,8 @@ const DEFAULT_DATA = {
   meals: {}, // 'YYYY-MM-DD': {lunch:[{id,text}], dinner:[{id,text}], dessert:[{id,text}]}
   gratitude: {}, // 'YYYY-MM-DD': ['','','','','']
   scriptureEntries: {}, // 'YYYY-MM-DD': {verse, ref, affirmation}
+  scripturePlans: [], // [{id, title, days: [{ref, affirmation}, ...31]}]
+  scriptureMonthAssignments: {}, // 'YYYY-MM': planId
   water: {}, // 'YYYY-MM-DD': count
   liquidIV: {}, // 'YYYY-MM-DD': count
   electrolytes: {}, // 'YYYY-MM-DD': count
@@ -1214,6 +1274,7 @@ function renderActivePage(){
   if(page==='ingredients') renderMasterIngredients();
   if(page==='stock') renderStockList();
   if(page==='checklist') renderChecklist();
+  if(page==='scriptureplans') renderScripturePlans();
   if(page==='notes') renderNotes();
   if(page==='events') renderEventsTable();
   if(page==='todo') renderTodoDump();
@@ -1232,6 +1293,7 @@ document.querySelectorAll('.nav-item').forEach(item=>{
     if(item.dataset.page==='ingredients') renderMasterIngredients();
     if(item.dataset.page==='stock') renderStockList();
     if(item.dataset.page==='checklist') renderChecklist();
+    if(item.dataset.page==='scriptureplans') renderScripturePlans();
     if(item.dataset.page==='notes') renderNotes();
     if(item.dataset.page==='events') renderEventsTable();
     if(item.dataset.page==='todo') renderTodoDump();
@@ -2908,6 +2970,141 @@ document.getElementById('add-note-col').addEventListener('click', ()=>{
    CONTENT CHECKLIST
    ========================================================= */
 const CHECKLIST_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan'];
+
+/* =========================================================
+   SCRIPTURE PLANS
+   ========================================================= */
+function parseNumberedList(text){
+  const lines = text.split('\n');
+  const result = {};
+  lines.forEach(line=>{
+    const m = line.match(/^\s*(\d{1,2})\s*[\.\)]\s*(.+?)\s*$/);
+    if(m){
+      const day = Number(m[1]);
+      if(day>=1 && day<=31) result[day] = m[2].trim();
+    }
+  });
+  return result;
+}
+
+function renderScripturePlans(){
+  const listEl = document.getElementById('scripture-plans-list');
+  if(DATA.scripturePlans.length===0){
+    listEl.innerHTML = '<div class="empty-slot">No plans yet, add one below.</div>';
+  } else {
+    listEl.innerHTML = DATA.scripturePlans.map(plan=>{
+      const filledCount = plan.days.filter(d=>d.ref||d.affirmation).length;
+      return `
+      <div class="sp-plan-card" data-id="${plan.id}">
+        <div class="sp-plan-header">
+          <div>
+            <div class="sp-plan-title">${escapeHTML(plan.title)}</div>
+            <div class="sp-plan-meta">${filledCount} of 31 days filled in</div>
+          </div>
+          <div class="sp-plan-actions">
+            <button class="btn secondary small sp-toggle-btn">View / Edit Days</button>
+            <button class="icon-btn small-x sp-delete-btn" title="Delete plan">✕</button>
+          </div>
+        </div>
+        <div class="sp-plan-days" id="sp-days-${plan.id}"></div>
+      </div>`;
+    }).join('');
+  }
+
+  listEl.querySelectorAll('.sp-plan-card').forEach(card=>{
+    const id = card.dataset.id;
+    const plan = DATA.scripturePlans.find(p=>p.id===id);
+    const daysEl = card.querySelector('.sp-plan-days');
+    const toggleBtn = card.querySelector('.sp-toggle-btn');
+    toggleBtn.addEventListener('click', ()=>{
+      const open = daysEl.classList.contains('open');
+      if(open){ daysEl.classList.remove('open'); daysEl.innerHTML=''; }
+      else {
+        daysEl.classList.add('open');
+        daysEl.innerHTML = plan.days.map((d,i)=>`
+          <div class="sp-day-row">
+            <div class="sp-day-num">${i+1}</div>
+            <input type="text" placeholder="Reference" value="${escapeAttr(d.ref)}" data-field="ref" data-i="${i}">
+            <input type="text" placeholder="Affirmation" value="${escapeAttr(d.affirmation)}" data-field="affirmation" data-i="${i}">
+          </div>`).join('');
+        daysEl.querySelectorAll('input').forEach(inp=>{
+          inp.addEventListener('input', e=>{
+            const i = Number(inp.dataset.i), field = inp.dataset.field;
+            plan.days[i][field] = e.target.value;
+            saveData();
+          });
+        });
+      }
+    });
+    card.querySelector('.sp-delete-btn').addEventListener('click', ()=>{
+      showConfirm('Delete the "'+plan.title+'" plan? This cannot be undone.', ()=>{
+        DATA.scripturePlans = DATA.scripturePlans.filter(p=>p.id!==id);
+        saveData();
+        renderScripturePlans();
+      });
+    });
+  });
+
+  const assignSelect = document.getElementById('sp-assign-plan');
+  assignSelect.innerHTML = DATA.scripturePlans.length===0
+    ? '<option value="">No plans yet</option>'
+    : DATA.scripturePlans.map(p=>`<option value="${p.id}">${escapeHTML(p.title)}</option>`).join('');
+
+  const monthInput = document.getElementById('sp-assign-month');
+  if(!monthInput.value){
+    monthInput.value = DATA.calViewYear+'-'+pad(DATA.calViewMonth+1);
+  }
+}
+
+document.getElementById('sp-create-btn').addEventListener('click', ()=>{
+  const title = document.getElementById('sp-new-title').value.trim();
+  const refsText = document.getElementById('sp-new-refs').value;
+  const affsText = document.getElementById('sp-new-affs').value;
+  const errorEl = document.getElementById('sp-create-error');
+  errorEl.textContent = '';
+  if(!title){ errorEl.textContent = 'Give the plan a title.'; return; }
+  const refsParsed = parseNumberedList(refsText);
+  const affsParsed = parseNumberedList(affsText);
+  if(Object.keys(refsParsed).length===0 && Object.keys(affsParsed).length===0){
+    errorEl.textContent = 'Paste at least the references or affirmations in the numbered format (1.Text, 2.Text...).';
+    return;
+  }
+  const days = [];
+  for(let i=1;i<=31;i++){
+    days.push({ ref: refsParsed[i]||'', affirmation: affsParsed[i]||'' });
+  }
+  DATA.scripturePlans.push({id:uid(), title, days});
+  document.getElementById('sp-new-title').value='';
+  document.getElementById('sp-new-refs').value='';
+  document.getElementById('sp-new-affs').value='';
+  saveData();
+  renderScripturePlans();
+  showToast('"'+title+'" plan created with '+days.filter(d=>d.ref||d.affirmation).length+' days filled in.');
+});
+
+document.getElementById('sp-assign-btn').addEventListener('click', ()=>{
+  const monthVal = document.getElementById('sp-assign-month').value;
+  const planId = document.getElementById('sp-assign-plan').value;
+  if(!monthVal || !planId){ showToast('Pick both a month and a plan first.'); return; }
+  const plan = DATA.scripturePlans.find(p=>p.id===planId);
+  if(!plan) return;
+  const [yearStr, monthStr] = monthVal.split('-');
+  const year = Number(yearStr), month = Number(monthStr)-1;
+  const daysInMonth = new Date(year, month+1, 0).getDate();
+  for(let d=1; d<=daysInMonth && d<=31; d++){
+    const dateISO = year+'-'+pad(month+1)+'-'+pad(d);
+    const entry = ensureScriptureDay(dateISO);
+    const planDay = plan.days[d-1];
+    if(planDay){
+      entry.ref = planDay.ref || entry.ref;
+      entry.affirmation = planDay.affirmation || entry.affirmation;
+    }
+  }
+  DATA.scriptureMonthAssignments[monthVal] = planId;
+  saveData();
+  renderDashboard();
+  showToast('"'+plan.title+'" applied to '+monthName(month)+' '+year+'.');
+});
 
 function renderChecklist(){
   renderOneTimeChecklist();
