@@ -767,7 +767,7 @@ const DEFAULT_DATA = {
   water: {}, // 'YYYY-MM-DD': count
   liquidIV: {}, // 'YYYY-MM-DD': count
   electrolytes: {}, // 'YYYY-MM-DD': count
-  favMeals: { 'Saturday / Sunday':[], 'Monday':[], 'Tuesday / Thursday':[], 'Wednesday':[], 'Friday':[], 'Sometimes':[], 'Smoked':[], 'Winter / Crockpot':[] },
+  favMeals: { 'Sunday / Saturday':[], 'Monday':[], 'Tuesday / Thursday':[], 'Wednesday':[], 'Friday':[], 'Sometimes':[], 'Smoked':[], 'Winter / Crockpot':[] },
   groceryExtras: {}, // category -> [{id, name}]
   groceryCompletion: {}, // key: 'year-month|category|itemname|unit' -> true
   masterIngredients: {}, // category -> [{id, name}]
@@ -811,7 +811,7 @@ const DEFAULT_DATA = {
 };
 
 const GROCERY_CATEGORIES = ['Baking','Breads','Cans','Cereal','Condiments','Dairy','Drinks','Ethnic','Frozen','Meats','Misc','Paper / Cleaning','Pasta','Personal','Produce','Snacks','Still Need To Buy'];
-const FAV_MEAL_GROUPS = ['Saturday / Sunday','Monday','Tuesday / Thursday','Wednesday','Friday','Sometimes','Smoked','Winter / Crockpot','Sides','Desserts'];
+const FAV_MEAL_GROUPS = ['Sunday / Saturday','Monday','Tuesday / Thursday','Wednesday','Friday','Sometimes','Smoked','Winter / Crockpot','Sides','Desserts'];
 const MEASUREMENT_UNITS = ['', 'Cup', 'Oz', 'Tsp', 'Tbl', 'Lbs', 'Piece', 'Can', 'Package', 'Box', 'Bag', 'Jar', 'Bottle', 'Loaf', 'Clove'];
 
 function migrateFavMeals(){
@@ -820,7 +820,7 @@ function migrateFavMeals(){
     return (arr||[]).map(item => typeof item === 'string' ? {id:uid(), name:item, ingredients:[]} : {id:item.id||uid(), name:item.name||'', ingredients:item.ingredients||[]});
   }
   const merged = {};
-  merged['Saturday / Sunday'] = [...toObjArray(fm['Saturday / Sunday']), ...toObjArray(fm['Saturday']), ...toObjArray(fm['Sunday'])];
+  merged['Sunday / Saturday'] = [...toObjArray(fm['Sunday / Saturday']), ...toObjArray(fm['Saturday / Sunday']), ...toObjArray(fm['Saturday']), ...toObjArray(fm['Sunday'])];
   merged['Monday'] = toObjArray(fm['Monday']);
   merged['Tuesday / Thursday'] = [...toObjArray(fm['Tuesday / Thursday']), ...toObjArray(fm['Tuesday']), ...toObjArray(fm['Thursday'])];
   merged['Wednesday'] = toObjArray(fm['Wednesday']);
@@ -2171,8 +2171,7 @@ function renderFavMeals(){
       <div id="bigmeal-slots"></div>
     </div>
   `;
-  grid.innerHTML = FAV_MEAL_GROUPS.slice(0,5).map(boxHTML).join('') + bigMealHTML
-    + FAV_MEAL_GROUPS.slice(5).map(boxHTML).join('');
+  grid.innerHTML = bigMealHTML + FAV_MEAL_GROUPS.map(boxHTML).join('');
 
   function findItemById(id){
     for(const g of FAV_MEAL_GROUPS){
