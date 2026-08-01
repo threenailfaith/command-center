@@ -535,7 +535,6 @@
     <div class="page" id="page-events">
       <div class="page-head">
         <h1>Upcoming Events Dump</h1>
-        <p>Add holidays, birthdays, and appointments here. They'll flow onto the Dashboard automatically. Major U.S. holidays are pre-loaded and repeat every year on their own.</p>
       </div>
       <div class="sheet-toolbar">
         <button class="btn" id="add-event-row">+ Add Event</button>
@@ -560,7 +559,6 @@
     <div class="page" id="page-todo">
       <div class="page-head">
         <h1>To-Do Dump</h1>
-        <p>Add tasks here in order. The top 10 unfinished tasks show on your Dashboard. Check one off there and the next one moves up. Drag the ⠿ handle to reorder a list, or drag a task straight across from Next Week into This Week (or back) as plans change. Delete finished rows at the end of the week whenever you're ready.</p>
       </div>
 
       <div class="section-divider"><span>This Week</span><div class="line"></div></div>
@@ -586,7 +584,6 @@
     <div class="page" id="page-daily">
       <div class="page-head">
         <h1>Daily Tasks Setup</h1>
-        <p>Set up the tasks that repeat on the same day every week, tagged Home, TNF, or SSBB. These pull onto the Dashboard for whatever day you're viewing.</p>
       </div>
       <div class="setup-note">Tip: this is your recurring weekly rhythm, things like "Monday: trash day, Wednesday: content batching." Add as many as you need per day. Checking one off on the Dashboard only checks it for that specific date, it resets fresh each week.</div>
       <div id="daily-setup-container"></div>
@@ -596,7 +593,6 @@
     <div class="page" id="page-monthly">
       <div class="page-head">
         <h1>Monthly &amp; Yearly Tasks</h1>
-        <p>These are tasks tied to a pattern rather than one fixed date, like "the 1st of the month" or "the last Friday of November."</p>
       </div>
       <div class="sheet-toolbar">
         <button class="btn" id="add-my-row">+ Add Recurring Task</button>
@@ -618,7 +614,6 @@
     <div class="page" id="page-meals">
       <div class="page-head">
         <h1>Meal Planning</h1>
-        <p>Plan lunch and dinner ahead of time. Drag a favorite onto a day to add it, drop another on top to stack more than one item there (great for a quick side), or drag a favorite between day groups to reorganize. Each item gets its own small "⠿ Move" chip to drag it to a different day. Planning a dessert for a regular day? Just add it to the end of Dinner. For anything bigger, Thanksgiving, Christmas, birthdays, use the Big Meal Planner down in the Favorites section, it has its own Dinner and Dessert space with more room. Click a recipe's ingredient icon to attach ingredients, without cluttering this view, they only show up on the Grocery List page.</p>
       </div>
       <div class="cal-nav" style="max-width:900px;">
         <button id="meal-cal-prev">‹</button>
@@ -636,7 +631,6 @@
     <div class="page" id="page-grocery">
       <div class="page-head">
         <h1>Grocery List</h1>
-        <p>Automatically pulled from any recipe on your Meal Planning calendar that has ingredients attached, for whichever month you're viewing. Add anything else you're low on directly to a category below.</p>
       </div>
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px;">
         <div class="cal-nav" style="max-width:280px;margin-bottom:0;">
@@ -656,7 +650,6 @@
     <div class="page" id="page-ingredients">
       <div class="page-head">
         <h1>Master Ingredients List</h1>
-        <p>Keep one clean list of ingredients per category. When you're adding ingredients to a recipe on the Meal Planning page, you'll pick from this list instead of retyping, so nothing ends up spelled two different ways.</p>
       </div>
       <div id="master-ingredients-container"></div>
     </div>
@@ -665,7 +658,6 @@
     <div class="page" id="page-stock">
       <div class="page-head">
         <h1>Stock Check</h1>
-        <p>Run through this before you head to the store. Check "In Stock" as a reminder that you're good on it, or check "Need It" to send it straight to the Grocery List in the right category. "In Stock" resets fresh each month; "Need It" always matches whatever's currently on your Grocery List.</p>
       </div>
       <div class="cal-nav" style="max-width:280px;">
         <button id="stock-prev">‹</button>
@@ -686,7 +678,6 @@
     <div class="page" id="page-checklist">
       <div class="page-head">
         <h1>Content Checklist</h1>
-        <p>Check things off as you complete them each month. Not connected to the Dashboard.</p>
       </div>
       <div class="sheet-toolbar">
         <button class="btn danger" id="clear-checklist-btn">Clear All Checked Boxes</button>
@@ -728,7 +719,6 @@
     <div class="page" id="page-notes">
       <div class="page-head">
         <h1>General Notes</h1>
-        <p>A free space, not connected to the Dashboard. Use it however you'd like.</p>
       </div>
       <div class="sheet-toolbar">
         <button class="btn" id="add-note-row">+ Add Row</button>
@@ -769,7 +759,7 @@ const DEFAULT_DATA = {
   dailyRecurring: [], // {id, day(0-6), section, task}
   dailyCompletion: {}, // key: date|taskId -> true
   monthlyCompletion: {}, // key: date|taskId (or year-month|taskId for range rules) -> true
-  adhocDaily: {}, // 'YYYY-MM-DD': { Home:[{id,text,done}], TNF:[...], SSBB:[...] }
+  adhocDaily: {}, // 'YYYY-MM-DD': [{id, text, done, section}]
   monthlyYearly: [], // {id, type:'monthly'|'yearly', month(0-11, null for monthly), ruleType:'dayOfMonth'|'nthWeekday', day, nth, weekday, task, section}
   meals: {}, // 'YYYY-MM-DD': {lunch:[{id,text}], dinner:[{id,text}], dessert:[{id,text}]}
   gratitude: {}, // 'YYYY-MM-DD': ['','','','','']
@@ -895,9 +885,24 @@ function migrateIngredientsAndMasterList(){
   });
 }
 
+function migrateAdhocDaily(){
+  Object.keys(DATA.adhocDaily).forEach(dateISO=>{
+    const val = DATA.adhocDaily[dateISO];
+    if(Array.isArray(val)) return; // already migrated
+    const flat = [];
+    ['Home','TNF','SSBB'].forEach(section=>{
+      (val[section]||[]).forEach(item=>{
+        flat.push({id: item.id||uid(), text: item.text||'', done: !!item.done, section});
+      });
+    });
+    DATA.adhocDaily[dateISO] = flat;
+  });
+}
+
 let DATA = loadData();
 migrateFavMeals();
 migrateMealsToArrays();
+migrateAdhocDaily();
 migrateIngredientsAndMasterList();
 seedHolidaysIfNeeded();
 seedStockItemsIfNeeded();
@@ -1463,7 +1468,9 @@ function renderTodoDump(){
       `;
       tr.querySelector('[data-field=tag]').addEventListener('change', e=>{ t.tag=e.target.value; saveData(); renderDashTodo(); });
       tr.querySelector('[data-field=task]').addEventListener('input', e=>{ t.task=e.target.value; saveData(); renderDashTodo(); });
-      tr.querySelector('[data-field=done]').addEventListener('change', e=>{ t.done=e.target.checked; saveData(); renderTodoDump(); renderDashTodo(); });
+      tr.querySelector('[data-field=done]').addEventListener('change', e=>{
+        if(e.target.checked) completeTodoTask(t.id);
+      });
       tr.querySelector('.icon-btn').addEventListener('click', ()=>{
         DATA.todoDump[week] = DATA.todoDump[week].filter(x=>x.id!==t.id);
         saveData(); renderTodoDump(); renderDashTodo();
@@ -1526,6 +1533,21 @@ function quickAddTodo(){
 document.getElementById('quick-add-btn').addEventListener('click', quickAddTodo);
 document.getElementById('quick-add-task').addEventListener('keydown', e=>{ if(e.key==='Enter') quickAddTodo(); });
 
+function completeTodoTask(id){
+  const t = [...DATA.todoDump.this, ...DATA.todoDump.next].find(x=>x.id===id);
+  if(!t) return;
+  const adhocDay = ensureAdhocDay(DATA.selectedDate);
+  adhocDay.push({id:uid(), text:t.task, done:true, section:t.tag, fromTodo:true});
+  DATA.todoDump.this = DATA.todoDump.this.filter(x=>x.id!==id);
+  DATA.todoDump.next = DATA.todoDump.next.filter(x=>x.id!==id);
+  saveData();
+  renderDashTodo();
+  renderTodoDump();
+  renderDashDaily();
+  const d = fromISO(DATA.selectedDate);
+  showToast('"'+t.task+'" marked done and added to your '+monthName(d.getMonth())+' '+d.getDate()+' record.');
+}
+
 function renderDashTodo(){
   const queue = [...DATA.todoDump.this, ...DATA.todoDump.next].filter(t=>!t.done && t.task && t.task.trim()!=='');
   const shown = queue.slice(0,10);
@@ -1549,8 +1571,7 @@ function renderDashTodo(){
   el.querySelectorAll('.task-row input[type=checkbox]').forEach(cb=>{
     cb.addEventListener('change', ()=>{
       const id = cb.closest('.task-row').dataset.id;
-      const t = [...DATA.todoDump.this, ...DATA.todoDump.next].find(x=>x.id===id);
-      if(t){ t.done = true; saveData(); renderDashTodo(); renderTodoDump(); }
+      completeTodoTask(id);
     });
   });
 }
@@ -1623,7 +1644,7 @@ function renderDailySetup(){
 }
 
 function ensureAdhocDay(dateISO){
-  if(!DATA.adhocDaily[dateISO]) DATA.adhocDaily[dateISO] = {Home:[], TNF:[], SSBB:[]};
+  if(!DATA.adhocDaily[dateISO]) DATA.adhocDaily[dateISO] = [];
   return DATA.adhocDaily[dateISO];
 }
 
@@ -1640,7 +1661,7 @@ function renderDashDaily(){
   ['Home','TNF','SSBB'].forEach(section=>{
     const el = document.getElementById('dt-'+section.toLowerCase());
     const recurringItems = DATA.dailyRecurring.filter(t=>t.day===dow && sectionMatchesColumn(t.section, section) && t.task && t.task.trim()!=='');
-    const adhocItems = adhocDay[section] || [];
+    const adhocItems = adhocDay.filter(item=>sectionMatchesColumn(item.section, section));
 
     let html = '';
     if(recurringItems.length===0 && adhocItems.length===0){
@@ -1653,7 +1674,9 @@ function renderDashDaily(){
         return `<div class="dt-item ${done?'done':''}" data-key="${key}"><input type="checkbox" ${done?'checked':''}><span>${escapeHTML(t.task)}${badge}</span></div>`;
       }).join('');
       html += adhocItems.map(item=>{
-        return `<div class="dt-item adhoc ${item.done?'done':''}" data-adhoc-id="${item.id}"><input type="checkbox" ${item.done?'checked':''}><span>${escapeHTML(item.text)}</span><button class="icon-btn small-x" title="Delete">✕</button></div>`;
+        const badge = item.section==='SSBB_TNF' ? ' <span class="tag tag-SSBB_TNF" style="margin-left:4px;">SSBB &amp; TNF</span>' : '';
+        const fromTodo = item.fromTodo ? ' <span class="tag tag-Home" style="margin-left:4px;background:var(--lavender);color:var(--purple);">✓ completed</span>' : '';
+        return `<div class="dt-item adhoc ${item.done?'done':''}" data-adhoc-id="${item.id}"><input type="checkbox" ${item.done?'checked':''}><span>${escapeHTML(item.text)}${badge}${fromTodo}</span><button class="icon-btn small-x" title="Delete">✕</button></div>`;
       }).join('');
     }
     el.innerHTML = html;
@@ -1668,11 +1691,11 @@ function renderDashDaily(){
     el.querySelectorAll('.dt-item[data-adhoc-id]').forEach(row=>{
       const id = row.dataset.adhocId;
       row.querySelector('input').addEventListener('change', e=>{
-        const item = adhocDay[section].find(x=>x.id===id);
+        const item = adhocDay.find(x=>x.id===id);
         if(item){ item.done = e.target.checked; saveData(); renderDashDaily(); }
       });
       row.querySelector('.icon-btn').addEventListener('click', ()=>{
-        adhocDay[section] = adhocDay[section].filter(x=>x.id!==id);
+        DATA.adhocDaily[DATA.selectedDate] = adhocDay.filter(x=>x.id!==id);
         saveData(); renderDashDaily();
       });
     });
@@ -1686,7 +1709,7 @@ function renderDashDaily(){
     const val = input.value.trim();
     if(!val) return;
     const day = ensureAdhocDay(DATA.selectedDate);
-    day[section].push({id:uid(), text:val, done:false});
+    day.push({id:uid(), text:val, done:false, section});
     input.value = '';
     saveData();
     renderDashDaily();
@@ -2148,8 +2171,8 @@ function renderFavMeals(){
       <div id="bigmeal-slots"></div>
     </div>
   `;
-  grid.innerHTML = boxHTML(FAV_MEAL_GROUPS[0]) + boxHTML(FAV_MEAL_GROUPS[1]) + bigMealHTML
-    + FAV_MEAL_GROUPS.slice(2).map(boxHTML).join('');
+  grid.innerHTML = FAV_MEAL_GROUPS.slice(0,5).map(boxHTML).join('') + bigMealHTML
+    + FAV_MEAL_GROUPS.slice(5).map(boxHTML).join('');
 
   function findItemById(id){
     for(const g of FAV_MEAL_GROUPS){
