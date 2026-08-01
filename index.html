@@ -94,10 +94,14 @@
   /* Scripture card */
   .scripture-card{background:var(--navy);color:#fff;border:none;}
   .scripture-card h2{color:rgba(255,255,255,0.75);}
-  .scripture-verse{font-family:'Lora',serif;font-style:italic;font-size:18px;line-height:1.55;margin:6px 0 4px 0;}
-  .scripture-ref{font-size:12.5px;color:var(--gold);letter-spacing:0.4px;margin-bottom:16px;font-weight:600;}
+  .scripture-verse-input{font-family:'Lora',serif;font-style:italic;font-size:17px;line-height:1.5;margin:6px 0 6px 0;width:100%;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.18);border-radius:8px;padding:8px 10px;color:#fff;resize:vertical;font-weight:400;}
+  .scripture-verse-input::placeholder{color:rgba(255,255,255,0.4);font-style:italic;}
+  .scripture-ref-input{font-size:12.5px;color:var(--gold);letter-spacing:0.4px;margin-bottom:16px;font-weight:600;width:100%;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.18);border-radius:8px;padding:7px 10px;}
+  .scripture-ref-input::placeholder{color:rgba(255,255,255,0.35);font-weight:500;}
   .affirmation-label{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,0.5);margin-bottom:4px;}
-  .affirmation-text{font-size:15px;line-height:1.5;color:#fff;}
+  .affirmation-input{font-size:14.5px;line-height:1.5;color:#fff;width:100%;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.18);border-radius:8px;padding:8px 10px;resize:vertical;font-family:'DM Sans',sans-serif;}
+  .affirmation-input::placeholder{color:rgba(255,255,255,0.4);}
+  .scripture-verse-input:focus, .scripture-ref-input:focus, .affirmation-input:focus{outline:none;border-color:var(--gold);background:rgba(255,255,255,0.13);}
 
   /* Calendar */
   .cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
@@ -168,14 +172,13 @@
   /* Meals */
   .meal-block{display:flex;gap:14px;}
   .gratitude-list{display:flex;flex-direction:column;gap:8px;}
-  .water-tracker{display:flex;flex-direction:column;align-items:center;gap:12px;}
-  .water-count-row{display:flex;align-items:center;gap:16px;}
-  .water-btn{width:34px;height:34px;border-radius:50%;border:1px solid var(--border);background:#fff;color:var(--navy);font-size:18px;font-weight:700;line-height:1;cursor:pointer;}
-  .water-btn:hover{background:var(--lavender);}
-  .water-count-display{font-size:16px;font-weight:700;color:var(--navy);min-width:110px;text-align:center;}
-  .water-drops{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;font-size:20px;line-height:1;}
-  .water-drop{opacity:0.25;filter:grayscale(1);transition:all .15s ease;}
-  .water-drop.filled{opacity:1;filter:none;}
+  .intake-tracker{display:flex;flex-direction:column;gap:2px;}
+  .intake-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);}
+  .intake-row:last-child{border-bottom:none;}
+  .intake-label{flex:1;font-size:13px;color:var(--navy);font-weight:500;}
+  .intake-btn{width:24px;height:24px;border-radius:50%;border:1px solid var(--border);background:#fff;color:var(--navy);font-size:14px;font-weight:700;line-height:1;cursor:pointer;flex-shrink:0;padding:0;}
+  .intake-btn:hover{background:var(--lavender);}
+  .intake-num{font-size:15px;font-weight:700;color:var(--navy);min-width:20px;text-align:center;flex-shrink:0;}
   .gratitude-row{display:flex;align-items:center;gap:8px;}
   .gratitude-num{width:18px;height:18px;border-radius:50%;background:var(--lavender);color:var(--purple);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
   .gratitude-row input{flex:1;border:none;border-bottom:1px solid var(--border);padding:4px 2px;font-size:13.5px;color:var(--navy);background:transparent;}
@@ -424,10 +427,10 @@
         <div class="dash-col">
           <div class="card scripture-card">
             <h2>Today's Word</h2>
-            <div class="scripture-verse" id="scripture-verse"></div>
-            <div class="scripture-ref" id="scripture-ref"></div>
+            <textarea class="scripture-verse-input" id="scripture-verse-input" placeholder="Type today's scripture here..." rows="3"></textarea>
+            <input type="text" class="scripture-ref-input" id="scripture-ref-input" placeholder="Reference (e.g. John 3:16)">
             <div class="affirmation-label">Affirmation</div>
-            <div class="affirmation-text" id="affirmation-text"></div>
+            <textarea class="affirmation-input" id="affirmation-input" placeholder="Write today's affirmation..." rows="2"></textarea>
           </div>
 
           <div class="card">
@@ -481,15 +484,8 @@
           </div>
 
           <div class="card">
-            <h2>Water Tracker</h2>
-            <div class="water-tracker">
-              <div class="water-count-row">
-                <button class="water-btn" id="water-minus">−</button>
-                <div class="water-count-display"><span id="water-count-num">0</span> / 8 glasses</div>
-                <button class="water-btn" id="water-plus">+</button>
-              </div>
-              <div class="water-drops" id="water-drops"></div>
-            </div>
+            <h2>Daily Intake</h2>
+            <div class="intake-tracker" id="intake-tracker"></div>
           </div>
 
           <div class="card">
@@ -777,8 +773,10 @@ const DEFAULT_DATA = {
   monthlyYearly: [], // {id, type:'monthly'|'yearly', month(0-11, null for monthly), ruleType:'dayOfMonth'|'nthWeekday', day, nth, weekday, task, section}
   meals: {}, // 'YYYY-MM-DD': {lunch:[{id,text}], dinner:[{id,text}], dessert:[{id,text}]}
   gratitude: {}, // 'YYYY-MM-DD': ['','','','','']
+  scriptureEntries: {}, // 'YYYY-MM-DD': {verse, ref, affirmation}
   water: {}, // 'YYYY-MM-DD': count
-  waterGoal: 8,
+  liquidIV: {}, // 'YYYY-MM-DD': count
+  electrolytes: {}, // 'YYYY-MM-DD': count
   favMeals: { 'Saturday / Sunday':[], 'Monday':[], 'Tuesday / Thursday':[], 'Wednesday':[], 'Friday':[], 'Sometimes':[], 'Smoked':[], 'Winter / Crockpot':[] },
   groceryExtras: {}, // category -> [{id, name}]
   groceryCompletion: {}, // key: 'year-month|category|itemname|unit' -> true
@@ -1021,85 +1019,27 @@ document.querySelectorAll('.nav-item').forEach(item=>{
 });
 
 /* =========================================================
-   SCRIPTURE + AFFIRMATION (cycles by day of year)
+   SCRIPTURE + AFFIRMATION (editable, per day)
    ========================================================= */
-const SCRIPTURE_SET = [
-["The Lord is my shepherd; I shall not want.","Psalm 23:1","Father God provides for every need before I even see it."],
-["Trust in the Lord with all thine heart, and lean not unto thine own understanding.","Proverbs 3:5","Today I release my plans into God's hands and rest in His timing."],
-["Be still, and know that I am God.","Psalm 46:10","Stillness with Father God is not wasted time, it is where peace grows."],
-["I can do all things through Christ which strengtheneth me.","Philippians 4:13","Strength for today comes from walking WITH God, not from my own effort."],
-["For I know the thoughts that I think toward you, saith the Lord, thoughts of peace, and not of evil, to give you an expected end.","Jeremiah 29:11","Hope is steady today because Father God's plans for me are good."],
-["The Lord is my light and my salvation; whom shall I fear?","Psalm 27:1","Fear loses its grip when I remember who is walking beside me."],
-["Cast thy burden upon the Lord, and he shall sustain thee.","Psalm 55:22","Whatever feels heavy today, I can set it down in prayer."],
-["And we know that all things work together for good to them that love God.","Romans 8:28","Even the hard parts of today are being woven into something good."],
-["Come unto me, all ye that labour and are heavy laden, and I will give you rest.","Matthew 11:28","Rest is not a luxury, it is an invitation from Father God."],
-["The joy of the Lord is your strength.","Nehemiah 8:10","Joy fuels me more than hustle ever could."],
-["Fear thou not; for I am with thee: be not dismayed; for I am thy God.","Isaiah 41:10","Courage today is simply remembering I am not doing this alone."],
-["This is the day which the Lord hath made; we will rejoice and be glad in it.","Psalm 118:24","Today is a gift, and I choose to receive it with gladness."],
-["Delight thyself also in the Lord: and he shall give thee the desires of thine heart.","Psalm 37:4","Joy in Father God's presence reshapes what my heart even desires."],
-["Let not your heart be troubled: ye believe in God, believe also in me.","John 14:1","Peace is available to me right now, not just after the to-do list is done."],
-["The Lord thy God in the midst of thee is mighty; he will save, he will rejoice over thee with joy.","Zephaniah 3:17","Father God delights in me, not just in what I get done today."],
-["Wait on the Lord: be of good courage, and he shall strengthen thine heart.","Psalm 27:14","Patience today is an act of trust, not a sign of falling behind."],
-["My grace is sufficient for thee: for my strength is made perfect in weakness.","2 Corinthians 12:9","Weak moments today are where Father God's strength shows up clearest."],
-["In all thy ways acknowledge him, and he shall direct thy paths.","Proverbs 3:6","Every decision today gets easier when I bring it to God first."],
-["The Lord will fight for you, and ye shall hold your peace.","Exodus 14:14","Some battles today are not mine to carry alone."],
-["Peace I leave with you, my peace I give unto you.","John 14:27","A settled heart today is a gift, not something I have to earn."],
-["Rejoice in the Lord alway: and again I say, Rejoice.","Philippians 4:4","Joy is a choice available to me in this exact moment."],
-["He giveth power to the faint; and to them that have no might he increaseth strength.","Isaiah 40:29","Tired does not mean weak, Father God meets me right there."],
-["Be careful for nothing; but in every thing by prayer and supplication let your requests be made known unto God.","Philippians 4:6","Worry can turn into a prayer the moment I notice it today."],
-["The name of the Lord is a strong tower: the righteous runneth into it, and is safe.","Proverbs 18:10","When today feels unsteady, Father God is a place I can run to."],
-["Blessed are they that mourn: for they shall be comforted.","Matthew 5:4","Comfort meets me exactly in the places I feel the most tender today."],
-["Ye are the light of the world.","Matthew 5:14","Something small I do today can be light for someone else."],
-["Commit thy way unto the Lord; trust also in him; and he shall bring it to pass.","Psalm 37:5","Today's plans belong to God, not just to my own effort."],
-["Be strong and of a good courage, be not afraid, neither be thou dismayed: for the Lord thy God is with thee.","Joshua 1:9","Courage today is not the absence of fear, it is walking forward anyway."],
-["The Lord is nigh unto them that are of a broken heart.","Psalm 34:18","Father God is closest to me on the days that feel the heaviest."],
-["Draw nigh to God, and he will draw nigh to you.","James 4:8","One small step toward God today is met with His full presence."],
-["Now the God of hope fill you with all joy and peace in believing.","Romans 15:13","Hope today is not naive, it is rooted in who God has always been."],
-["The Lord is good, a strong hold in the day of trouble.","Nahum 1:7","Trouble today does not get the final word."],
-["Ask, and it shall be given you; seek, and ye shall find.","Matthew 7:7","Asking Father God for help today is not weakness, it is wisdom."],
-["The eternal God is thy refuge, and underneath are the everlasting arms.","Deuteronomy 33:27","I am held today, even in the moments that feel unsteady."],
-["A merry heart doeth good like a medicine.","Proverbs 17:22","Laughter today is not a distraction, it is nourishment."],
-["Be not afraid of sudden fear.","Proverbs 3:25","Surprises today do not have to shake my peace."],
-["The Lord shall preserve thy going out and thy coming in.","Psalm 121:8","Every part of today, coming and going, is covered."],
-["Let all that you do be done in love.","1 Corinthians 16:14","Love can shape the smallest task on today's list."],
-["Give thanks unto the Lord; for he is good.","Psalm 107:1","Gratitude today changes how the whole day feels."],
-["Search me, O God, and know my heart.","Psalm 139:23","Honesty with Father God today makes room for real growth."],
-["Be ye kind one to another, tenderhearted, forgiving one another.","Ephesians 4:32","Kindness today costs me little and gives someone else so much."],
-["The steadfast love of the Lord never ceases.","Lamentations 3:22","Nothing about today can outrun God's steady love."],
-["Underneath are the everlasting arms.","Deuteronomy 33:27","Support is there today even in the moments I cannot see it."],
-["He healeth the broken in heart, and bindeth up their wounds.","Psalm 147:3","Healing today happens quietly, sometimes without me even noticing."],
-["Ye shall know the truth, and the truth shall make you free.","John 8:32","Truth today brings freedom, even when it is hard to hear."],
-["The Lord is my strength and my shield.","Psalm 28:7","Protection and strength today come from the same steady source."],
-["Great is thy faithfulness.","Lamentations 3:23","Faithfulness today does not depend on how I feel, it depends on who God is."],
-["Let your light so shine before men, that they may see your good works.","Matthew 5:16","Quiet faithfulness today can be a light someone else needed."],
-["Blessed is the man that trusteth in the Lord, and whose hope the Lord is.","Jeremiah 17:7","Hope today is anchored in something steadier than circumstances."],
-["My soul, wait thou only upon God; for my expectation is from him.","Psalm 62:5","Waiting today is not wasted, it is where trust is built."],
-["The Lord hath done great things for us; whereof we are glad.","Psalm 126:3","Today holds proof, however small, of God's goodness."],
-["He that dwelleth in the secret place of the most High shall abide under the shadow of the Almighty.","Psalm 91:1","Shelter today is only a prayer away."],
-["Ye have not, because ye ask not.","James 4:2","Today, I do not have to figure it all out alone, I can simply ask."],
-["Be of one mind, live in peace; and the God of love and peace shall be with you.","2 Corinthians 13:11","Peace today starts with a settled, willing heart."],
-["The Lord upholdeth all that fall, and raiseth up all those that be bowed down.","Psalm 145:14","Stumbling today does not mean I am left there."],
-["Continue in prayer, and watch in the same with thanksgiving.","Colossians 4:2","A thankful prayer today reshapes how I see everything else."],
-["He hath made every thing beautiful in his time.","Ecclesiastes 3:11","Today does not have to be finished or perfect to be beautiful."],
-["The Lord will give strength unto his people; the Lord will bless his people with peace.","Psalm 29:11","Strength and peace today are both gifts, not things I have to manufacture."],
-["Godliness with contentment is great gain.","1 Timothy 6:6","Contentment today is worth more than checking every box."],
-["Casting all your care upon him; for he careth for you.","1 Peter 5:7","Care today is not something I carry alone, it is something I hand over."],
-["The Lord is good unto them that wait for him.","Lamentations 3:25","Slow answers today do not mean forgotten prayers."],
-["Charity suffereth long, and is kind.","1 Corinthians 13:4","Patience with others today is one of the truest forms of love."]
-];
-
-function getDayOfYear(d){
-  const start = new Date(d.getFullYear(),0,0);
-  const diff = d - start;
-  return Math.floor(diff / 86400000);
+function ensureScriptureDay(dateISO){
+  if(!DATA.scriptureEntries[dateISO]) DATA.scriptureEntries[dateISO] = {verse:'', ref:'', affirmation:''};
+  return DATA.scriptureEntries[dateISO];
 }
 function renderScripture(dateObj){
-  const doy = getDayOfYear(dateObj);
-  const entry = SCRIPTURE_SET[doy % SCRIPTURE_SET.length];
-  document.getElementById('scripture-verse').textContent = '"'+entry[0]+'"';
-  document.getElementById('scripture-ref').textContent = entry[1].toUpperCase();
-  document.getElementById('affirmation-text').textContent = entry[2];
+  const iso = toISO(dateObj);
+  const entry = ensureScriptureDay(iso);
+  const verseInput = document.getElementById('scripture-verse-input');
+  const refInput = document.getElementById('scripture-ref-input');
+  const affInput = document.getElementById('affirmation-input');
+  verseInput.value = entry.verse;
+  refInput.value = entry.ref;
+  affInput.value = entry.affirmation;
+
+  verseInput.oninput = () => { ensureScriptureDay(iso).verse = verseInput.value; saveData(); };
+  refInput.oninput = () => { ensureScriptureDay(iso).ref = refInput.value; saveData(); };
+  affInput.oninput = () => { ensureScriptureDay(iso).affirmation = affInput.value; saveData(); };
 }
+
 
 /* =========================================================
    DASHBOARD DATE HEADER
@@ -1931,17 +1871,6 @@ function renderMealSlotItems(container, dateISO, slot, opts){
   } else {
     container.innerHTML = items.map(it=>opts.itemTemplate(it)).join('');
   }
-  container.querySelectorAll('[data-move-handle]').forEach(handle=>{
-    handle.addEventListener('dragstart', e=>{
-      const itemId = handle.dataset.itemId;
-      const item = day[slot].find(x=>x.id===itemId);
-      if(!item) return;
-      e.dataTransfer.setData('text/plain', item.text);
-      e.dataTransfer.setData('application/x-meal-move', JSON.stringify({iso:dateISO, slot, itemId}));
-      e.dataTransfer.effectAllowed = 'move';
-      e.stopPropagation();
-    });
-  });
   container.querySelectorAll('[data-del-item]').forEach(btn=>{
     btn.addEventListener('click', e=>{
       e.stopPropagation();
@@ -1951,43 +1880,46 @@ function renderMealSlotItems(container, dateISO, slot, opts){
       if(opts.onChange) opts.onChange();
     });
   });
-}
 
-function handleMealSlotDrop(e, dateISO, slot, onChange){
-  e.preventDefault();
-  const text = e.dataTransfer.getData('text/plain');
-  if(!text || !text.trim()) return;
-  const day = ensureMealDay(dateISO);
-  const moveDataRaw = e.dataTransfer.getData('application/x-meal-move');
-  let moved = false;
-  let sourceRemoved = null;
+  if(typeof Sortable !== 'undefined'){
+    new Sortable(container, {
+      handle: '.meal-item-move',
+      animation: 150,
+      group: {
+        name: 'meal-scheduling',
+        pull: true,
+        put: true
+      },
+      onAdd: function(evt){
+        const itemEl = evt.item;
+        const fromEl = evt.from;
+        const toIso = container.dataset.iso, toSlot = container.dataset.slot;
+        const toDay = ensureMealDay(toIso);
 
-  if(moveDataRaw){
-    try{
-      const src = JSON.parse(moveDataRaw);
-      const srcDay = ensureMealDay(src.iso);
-      const idx = srcDay[src.slot].findIndex(x=>x.id===src.itemId);
-      if(idx > -1){
-        sourceRemoved = srcDay[src.slot][idx];
-        if(!(src.iso===dateISO && src.slot===slot)){
-          srcDay[src.slot].splice(idx,1);
-          moved = true;
+        if(fromEl.classList.contains('fav-list')){
+          const text = itemEl.dataset.favName || (itemEl.querySelector('.fav-item-text') ? itemEl.querySelector('.fav-item-text').textContent : '');
+          if(text && text.trim()){
+            toDay[toSlot].push({id:uid(), text: text.trim()});
+            showToast('Added "'+text.trim()+'" to '+toSlot+'.');
+          }
+        } else {
+          const id = itemEl.dataset.id;
+          const text = itemEl.dataset.text;
+          const fromIso = fromEl.dataset.iso, fromSlot = fromEl.dataset.slot;
+          if(fromIso !== undefined && fromSlot !== undefined){
+            const fromDay = ensureMealDay(fromIso);
+            fromDay[fromSlot] = fromDay[fromSlot].filter(x=>x.id!==id);
+          }
+          if(id && !toDay[toSlot].some(x=>x.id===id)){
+            toDay[toSlot].push({id, text});
+            showToast('Moved "'+text+'" to '+toSlot+'.');
+          }
         }
+        saveData();
+        if(opts.onChange) opts.onChange();
       }
-    }catch(err){}
+    });
   }
-
-  if(moved && sourceRemoved){
-    day[slot].push({id: sourceRemoved.id, text: sourceRemoved.text});
-  } else if(!moveDataRaw){
-    day[slot].push({id:uid(), text});
-  }
-
-  saveData();
-  if(onChange) onChange();
-  const d = fromISO(dateISO);
-  const label = monthName(d.getMonth())+' '+d.getDate();
-  showToast((moved ? 'Moved "' : 'Added "')+text+'" to '+slot+' on '+label+'.');
 }
 
 function renderMealCal(){
@@ -2033,18 +1965,12 @@ function renderMealCal(){
   table.querySelectorAll('.meal-slot-items').forEach(container=>{
     const iso = container.dataset.iso, slot = container.dataset.slot;
     renderMealSlotItems(container, iso, slot, {
-      itemTemplate: it => `<div class="meal-item-line">
-          <span class="meal-item-move" draggable="true" data-move-handle data-item-id="${it.id}" title="Drag to move">⠿</span>
+      itemTemplate: it => `<div class="meal-item-line" data-id="${it.id}" data-text="${escapeAttr(it.text)}">
+          <span class="meal-item-move" title="Drag to move">⠿</span>
           <span class="meal-item-text">${escapeHTML(it.text)}</span>
           <button class="meal-item-del" data-del-item="${it.id}" title="Remove">✕</button>
         </div>`,
       onChange: ()=>{ renderMealCal(); renderDashMeals(); renderBigMealPanel(); }
-    });
-    container.addEventListener('dragover', e=>{ e.preventDefault(); container.classList.add('drag-over'); });
-    container.addEventListener('dragleave', ()=> container.classList.remove('drag-over'));
-    container.addEventListener('drop', e=>{
-      container.classList.remove('drag-over');
-      handleMealSlotDrop(e, iso, slot, ()=>{ renderMealCal(); renderDashMeals(); renderBigMealPanel(); });
     });
   });
 
@@ -2104,18 +2030,12 @@ function renderBigMealPanel(){
     const slot = itemsEl.dataset.slot;
     renderMealSlotItems(itemsEl, iso, slot, {
       emptyHTML: '<div class="bigmeal-empty">Nothing added yet</div>',
-      itemTemplate: it => `<div class="bigmeal-item-row">
-          <span class="meal-item-move" draggable="true" data-move-handle data-item-id="${it.id}" title="Drag to move">⠿</span>
+      itemTemplate: it => `<div class="bigmeal-item-row" data-id="${it.id}" data-text="${escapeAttr(it.text)}">
+          <span class="meal-item-move" title="Drag to move">⠿</span>
           <span>${escapeHTML(it.text)}</span>
           <button class="icon-btn small-x" data-del-item="${it.id}">✕</button>
         </div>`,
       onChange: ()=>{ renderBigMealPanel(); renderMealCal(); renderDashMeals(); }
-    });
-    itemsEl.addEventListener('dragover', e=>{ e.preventDefault(); itemsEl.classList.add('drag-over'); });
-    itemsEl.addEventListener('dragleave', ()=> itemsEl.classList.remove('drag-over'));
-    itemsEl.addEventListener('drop', e=>{
-      itemsEl.classList.remove('drag-over');
-      handleMealSlotDrop(e, iso, slot, ()=>{ renderBigMealPanel(); renderMealCal(); renderDashMeals(); });
     });
   });
 
@@ -2149,27 +2069,36 @@ function renderDashMeals(){
   fill('dash-dinner', day.dinner);
 }
 
+const INTAKE_ITEMS = [
+  {key:'water', label:'Water (glasses)'},
+  {key:'liquidIV', label:'Liquid IV packets'},
+  {key:'electrolytes', label:'Electrolyte packets'}
+];
 function renderDashWater(){
-  const goal = DATA.waterGoal || 8;
-  const count = DATA.water[DATA.selectedDate] || 0;
-  document.getElementById('water-count-num').textContent = count;
-  const dropsEl = document.getElementById('water-drops');
-  let html = '';
-  for(let i=0;i<goal;i++){
-    html += `<span class="water-drop ${i<count?'filled':''}">\u{1F4A7}</span>`;
-  }
-  dropsEl.innerHTML = html;
+  const el = document.getElementById('intake-tracker');
+  el.innerHTML = INTAKE_ITEMS.map(item=>{
+    const count = (DATA[item.key] && DATA[item.key][DATA.selectedDate]) || 0;
+    return `<div class="intake-row" data-key="${item.key}">
+      <span class="intake-label">${item.label}</span>
+      <button class="intake-btn" data-dir="-1">−</button>
+      <span class="intake-num">${count}</span>
+      <button class="intake-btn" data-dir="1">+</button>
+    </div>`;
+  }).join('');
+  el.querySelectorAll('.intake-row').forEach(row=>{
+    const key = row.dataset.key;
+    row.querySelectorAll('.intake-btn').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        if(!DATA[key]) DATA[key] = {};
+        const dir = Number(btn.dataset.dir);
+        const current = DATA[key][DATA.selectedDate] || 0;
+        DATA[key][DATA.selectedDate] = Math.max(0, current + dir);
+        saveData();
+        renderDashWater();
+      });
+    });
+  });
 }
-document.getElementById('water-plus').addEventListener('click', ()=>{
-  DATA.water[DATA.selectedDate] = (DATA.water[DATA.selectedDate]||0) + 1;
-  saveData();
-  renderDashWater();
-});
-document.getElementById('water-minus').addEventListener('click', ()=>{
-  DATA.water[DATA.selectedDate] = Math.max(0, (DATA.water[DATA.selectedDate]||0) - 1);
-  saveData();
-  renderDashWater();
-});
 
 function renderDashGratitude(){
   if(!DATA.gratitude[DATA.selectedDate]) DATA.gratitude[DATA.selectedDate] = ['','','','',''];
@@ -2226,7 +2155,7 @@ function renderFavMeals(){
     const list = DATA.favMeals[g] || [];
     if(list.length===0){ ul.innerHTML = '<li class="fav-empty">None yet</li>'; return; }
     ul.innerHTML = list.map(m=>`
-      <li class="fav-item" data-id="${m.id}" draggable="true" title="Drag onto a day's Lunch or Dinner box, or drag to another day group">
+      <li class="fav-item" data-id="${m.id}" data-fav-name="${escapeAttr(m.name)}" title="Drag onto a day's Lunch or Dinner box, or drag to another day group">
         <div class="fav-item-row">
           <span class="fav-drag-dots">⠿</span>
           <span class="fav-item-text">${escapeHTML(m.name)}</span>
@@ -2239,11 +2168,6 @@ function renderFavMeals(){
     ul.querySelectorAll('.fav-item').forEach(li=>{
       const id = li.dataset.id;
       const item = list.find(x=>x.id===id);
-
-      li.addEventListener('dragstart', e=>{
-        e.dataTransfer.setData('text/plain', item.name);
-        e.dataTransfer.effectAllowed = 'copyMove';
-      });
 
       li.querySelector('.fav-del').addEventListener('click', e=>{
         e.stopPropagation();
@@ -2375,7 +2299,11 @@ function renderFavMeals(){
       new Sortable(ul, {
         handle: '.fav-drag-dots',
         animation: 150,
-        group: 'fav-meals',
+        group: {
+          name: 'meal-scheduling',
+          pull: (to) => to.el.classList.contains('fav-list') ? true : 'clone',
+          put: (to, from) => from.el.classList.contains('fav-list')
+        },
         onEnd: function(){
           const allLists = grid.querySelectorAll('.fav-list');
           const rebuilt = {};
