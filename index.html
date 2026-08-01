@@ -1053,7 +1053,7 @@ function startCloudSync(uid){
     document.getElementById('auth-loading').style.display = 'none';
     document.getElementById('auth-screen').style.display = 'none';
     document.getElementById('main-app').style.display = 'flex';
-    renderDashboard();
+    renderActivePage();
     setSyncStatus('synced', 'Synced across your devices');
 
     // Listen for changes from other devices
@@ -1067,7 +1067,7 @@ function startCloudSync(uid){
         migrateFavMeals(); migrateMealsToArrays(); migrateAdhocDaily(); migrateIngredientsAndMasterList();
         seedHolidaysIfNeeded(); seedStockItemsIfNeeded();
         localStorage.setItem(STORE_KEY, JSON.stringify(DATA));
-        renderDashboard();
+        renderActivePage();
         setSyncStatus('synced', 'Updated from another device');
       }catch(e){
         console.error('Could not apply remote update', e);
@@ -1083,7 +1083,7 @@ function startCloudSync(uid){
     document.getElementById('auth-screen').style.display = 'none';
     document.getElementById('main-app').style.display = 'flex';
     cloudSyncReady = true;
-    renderDashboard();
+    renderActivePage();
   });
 }
 
@@ -1203,6 +1203,22 @@ document.getElementById('import-file-input').addEventListener('change', (e)=>{
 /* =========================================================
    NAVIGATION
    ========================================================= */
+function renderActivePage(){
+  const activeItem = document.querySelector('.nav-item.active');
+  const page = activeItem ? activeItem.dataset.page : 'dashboard';
+  renderDashboard();
+  if(page==='daily') renderDailySetup();
+  if(page==='monthly') renderMonthlyYearly();
+  if(page==='meals'){ renderMealCal(); renderFavMeals(); renderBigMealPanel(); }
+  if(page==='grocery') renderGroceryList();
+  if(page==='ingredients') renderMasterIngredients();
+  if(page==='stock') renderStockList();
+  if(page==='checklist') renderChecklist();
+  if(page==='notes') renderNotes();
+  if(page==='events') renderEventsTable();
+  if(page==='todo') renderTodoDump();
+}
+
 document.querySelectorAll('.nav-item').forEach(item=>{
   item.addEventListener('click', ()=>{
     document.querySelectorAll('.nav-item').forEach(i=>i.classList.remove('active'));
