@@ -1675,8 +1675,7 @@ function renderDashDaily(){
       }).join('');
       html += adhocItems.map(item=>{
         const badge = item.section==='SSBB_TNF' ? ' <span class="tag tag-SSBB_TNF" style="margin-left:4px;">SSBB &amp; TNF</span>' : '';
-        const fromTodo = item.fromTodo ? ' <span class="tag tag-Home" style="margin-left:4px;background:var(--lavender);color:var(--purple);">✓ completed</span>' : '';
-        return `<div class="dt-item adhoc ${item.done?'done':''}" data-adhoc-id="${item.id}"><input type="checkbox" ${item.done?'checked':''}><span>${escapeHTML(item.text)}${badge}${fromTodo}</span><button class="icon-btn small-x" title="Delete">✕</button></div>`;
+        return `<div class="dt-item adhoc ${item.done?'done':''}" data-adhoc-id="${item.id}"><input type="checkbox" ${item.done?'checked':''}><span>${escapeHTML(item.text)}${badge}</span><button class="icon-btn small-x" title="Delete">✕</button></div>`;
       }).join('');
     }
     el.innerHTML = html;
