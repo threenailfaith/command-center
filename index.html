@@ -137,7 +137,7 @@
   .task-row .task-text{flex:1;font-size:14px;}
   .task-row.done .task-text{text-decoration:line-through;color:var(--slate-light);}
   .empty-slot{padding:9px 0;font-size:13px;color:var(--slate-light);font-style:italic;}
-  .drag-handle{width:34px;padding:2px !important;text-align:center;cursor:grab;color:var(--slate-light);font-size:15px;user-select:none;}
+  .drag-handle{width:34px;padding:2px !important;text-align:center;cursor:grab;color:var(--slate-light);font-size:15px;user-select:none;touch-action:none;-webkit-touch-callout:none;}
   .drag-handle:active{cursor:grabbing;}
   tr.sortable-ghost{opacity:0.35;}
   tr.sortable-chosen td{background:var(--lavender) !important;}
@@ -253,7 +253,7 @@
   .meal-slot-items{min-height:4px;}
   .meal-slot-items.drag-over{outline:2px dashed var(--purple);background:var(--purple-bg);border-radius:4px;}
   .meal-item-line{display:flex;align-items:center;gap:3px;font-size:10.5px;color:#1a1a1a;font-weight:500;padding:1px 0;}
-  .meal-item-move{cursor:grab;color:var(--slate-light);font-size:9px;flex-shrink:0;}
+  .meal-item-move{cursor:grab;color:var(--slate-light);font-size:9px;flex-shrink:0;touch-action:none;user-select:none;-webkit-touch-callout:none;padding:4px 6px;margin:-4px -2px;}
   .meal-item-move:active{cursor:grabbing;}
   .meal-item-text{flex:1;word-break:break-word;}
   .meal-item-del{border:none;background:none;color:var(--slate-light);font-size:9px;padding:0 2px;flex-shrink:0;cursor:pointer;}
@@ -271,7 +271,7 @@
   .fav-item:active{cursor:grabbing;}
   .fav-item.sortable-ghost{opacity:0.35;}
   .fav-item-row{display:flex;align-items:center;gap:6px;}
-  .fav-drag-dots{color:var(--slate-light);font-size:13px;flex-shrink:0;}
+  .fav-drag-dots{color:var(--slate-light);font-size:13px;flex-shrink:0;touch-action:none;user-select:none;-webkit-touch-callout:none;padding:4px 6px;margin:-4px -2px;}
   .fav-item-text{flex:1;font-size:12.5px;color:var(--navy);}
   .fav-item .small-x{flex-shrink:0;font-size:10.5px;white-space:nowrap;}
   .fav-ing-toggle{color:var(--purple);}
@@ -1497,6 +1497,8 @@ function initTodoSortable(week){
   new Sortable(tbody, {
     handle: '.drag-handle',
     animation: 150,
+    forceFallback: true,
+    fallbackTolerance: 3,
     group: 'todo-dump',
     onEnd: function(){
       syncTodoListsFromDOM();
@@ -1602,6 +1604,8 @@ function renderDailySetup(){
       new Sortable(tbody, {
         handle: '.drag-handle',
         animation: 150,
+        forceFallback: true,
+        fallbackTolerance: 3,
         onEnd: function(){
           const newOrder = [...tbody.children].map(tr=>tr.dataset.id);
           const reorderedDayItems = newOrder.map(id => dayItems.find(t=>t.id===id));
@@ -1885,6 +1889,12 @@ function renderMealSlotItems(container, dateISO, slot, opts){
     new Sortable(container, {
       handle: '.meal-item-move',
       animation: 150,
+      forceFallback: true,
+      fallbackTolerance: 3,
+      scroll: true,
+      scrollSensitivity: 120,
+      scrollSpeed: 20,
+      bubbleScroll: true,
       group: {
         name: 'meal-scheduling',
         pull: true,
@@ -2299,6 +2309,12 @@ function renderFavMeals(){
       new Sortable(ul, {
         handle: '.fav-drag-dots',
         animation: 150,
+        forceFallback: true,
+        fallbackTolerance: 3,
+        scroll: true,
+        scrollSensitivity: 120,
+        scrollSpeed: 20,
+        bubbleScroll: true,
         group: {
           name: 'meal-scheduling',
           pull: (to) => to.el.classList.contains('fav-list') ? true : 'clone',
