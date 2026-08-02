@@ -611,27 +611,30 @@
       <div class="section-divider"><span>This Week</span><div class="line"></div></div>
       <div class="sheet-toolbar">
         <button class="btn" data-week="this" id="add-todo-this">+ Add Task</button>
+        <button class="btn secondary todo-dup-selected-btn" data-week="this">⧉ Duplicate Selected</button>
       </div>
       <table class="sheet">
-        <thead><tr><th style="width:34px;"></th><th style="width:120px;">Tag</th><th>Task</th><th class="chk-cell">Done</th><th class="del-cell"></th><th class="del-cell"></th></tr></thead>
+        <thead><tr><th class="chk-cell" style="width:36px;">Sel</th><th style="width:34px;"></th><th style="width:120px;">Tag</th><th>Task</th><th class="chk-cell">Done</th><th class="del-cell"></th><th class="del-cell"></th></tr></thead>
         <tbody id="todo-this-tbody"></tbody>
       </table>
 
       <div class="section-divider"><span>Next Week</span><div class="line"></div></div>
       <div class="sheet-toolbar">
         <button class="btn" data-week="next" id="add-todo-next">+ Add Task</button>
+        <button class="btn secondary todo-dup-selected-btn" data-week="next">⧉ Duplicate Selected</button>
       </div>
       <table class="sheet">
-        <thead><tr><th style="width:34px;"></th><th style="width:120px;">Tag</th><th>Task</th><th class="chk-cell">Done</th><th class="del-cell"></th><th class="del-cell"></th></tr></thead>
+        <thead><tr><th class="chk-cell" style="width:36px;">Sel</th><th style="width:34px;"></th><th style="width:120px;">Tag</th><th>Task</th><th class="chk-cell">Done</th><th class="del-cell"></th><th class="del-cell"></th></tr></thead>
         <tbody id="todo-next-tbody"></tbody>
       </table>
 
       <div class="section-divider"><span>Devotionals To Do</span><div class="line"></div></div>
       <div class="sheet-toolbar">
         <button class="btn" data-week="devotionals" id="add-todo-devotionals">+ Add Task</button>
+        <button class="btn secondary todo-dup-selected-btn" data-week="devotionals">⧉ Duplicate Selected</button>
       </div>
       <table class="sheet">
-        <thead><tr><th style="width:34px;"></th><th style="width:120px;">Tag</th><th>Task</th><th class="chk-cell">Done</th><th class="del-cell"></th><th class="del-cell"></th></tr></thead>
+        <thead><tr><th class="chk-cell" style="width:36px;">Sel</th><th style="width:34px;"></th><th style="width:120px;">Tag</th><th>Task</th><th class="chk-cell">Done</th><th class="del-cell"></th><th class="del-cell"></th></tr></thead>
         <tbody id="todo-devotionals-tbody"></tbody>
       </table>
     </div>
@@ -1747,6 +1750,7 @@ function renderTodoDump(){
       tr.dataset.id = t.id;
       if(t.done) tr.classList.add('row-done');
       tr.innerHTML = `
+        <td class="chk-cell"><input type="checkbox" class="todo-select-cb"></td>
         <td class="drag-handle" title="Drag to reorder or move to This Week / Next Week">⠿</td>
         <td>
           <select class="tag-select" data-field="tag" style="width:100%;border:none;">
@@ -1780,6 +1784,24 @@ function renderTodoDump(){
     });
   });
 }
+document.querySelectorAll('.todo-dup-selected-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const week = btn.dataset.week;
+    const tbody = document.getElementById('todo-'+week+'-tbody');
+    const selectedIds = [...tbody.querySelectorAll('.todo-select-cb:checked')].map(cb=>cb.closest('tr').dataset.id);
+    if(selectedIds.length===0){ showToast('Check a few tasks first, then click Duplicate Selected.'); return; }
+    const copies = [];
+    selectedIds.forEach(id=>{
+      const t = DATA.todoDump[week].find(x=>x.id===id);
+      if(t) copies.push({id:uid(), tag:t.tag, task:t.task, done:false});
+    });
+    DATA.todoDump[week].push(...copies);
+    saveData();
+    renderTodoDump();
+    renderDashTodo();
+    showToast(copies.length+' task'+(copies.length===1?'':'s')+' duplicated to the bottom of the list.');
+  });
+});
 document.getElementById('add-todo-this').addEventListener('click', ()=>{
   DATA.todoDump.this.push({id:uid(), tag:'Home', task:'', done:false});
   saveData(); renderTodoDump();
