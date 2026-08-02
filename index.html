@@ -613,7 +613,7 @@
         <button class="btn" data-week="this" id="add-todo-this">+ Add Task</button>
       </div>
       <table class="sheet">
-        <thead><tr><th style="width:34px;"></th><th style="width:120px;">Tag</th><th>Task</th><th class="chk-cell">Done</th><th class="del-cell"></th></tr></thead>
+        <thead><tr><th style="width:34px;"></th><th style="width:120px;">Tag</th><th>Task</th><th class="chk-cell">Done</th><th class="del-cell"></th><th class="del-cell"></th></tr></thead>
         <tbody id="todo-this-tbody"></tbody>
       </table>
 
@@ -622,7 +622,7 @@
         <button class="btn" data-week="next" id="add-todo-next">+ Add Task</button>
       </div>
       <table class="sheet">
-        <thead><tr><th style="width:34px;"></th><th style="width:120px;">Tag</th><th>Task</th><th class="chk-cell">Done</th><th class="del-cell"></th></tr></thead>
+        <thead><tr><th style="width:34px;"></th><th style="width:120px;">Tag</th><th>Task</th><th class="chk-cell">Done</th><th class="del-cell"></th><th class="del-cell"></th></tr></thead>
         <tbody id="todo-next-tbody"></tbody>
       </table>
 
@@ -631,7 +631,7 @@
         <button class="btn" data-week="devotionals" id="add-todo-devotionals">+ Add Task</button>
       </div>
       <table class="sheet">
-        <thead><tr><th style="width:34px;"></th><th style="width:120px;">Tag</th><th>Task</th><th class="chk-cell">Done</th><th class="del-cell"></th></tr></thead>
+        <thead><tr><th style="width:34px;"></th><th style="width:120px;">Tag</th><th>Task</th><th class="chk-cell">Done</th><th class="del-cell"></th><th class="del-cell"></th></tr></thead>
         <tbody id="todo-devotionals-tbody"></tbody>
       </table>
     </div>
@@ -1758,6 +1758,7 @@ function renderTodoDump(){
         </td>
         <td><input type="text" placeholder="Task" value="${escapeAttr(t.task||'')}" data-field="task"></td>
         <td class="chk-cell"><input type="checkbox" ${t.done?'checked':''} data-field="done"></td>
+        <td class="del-cell"><button class="icon-btn todo-dup-btn" title="Duplicate this task">⧉</button></td>
         <td class="del-cell"><button class="icon-btn" title="Delete">✕</button></td>
       `;
       tr.querySelector('[data-field=tag]').addEventListener('change', e=>{ t.tag=e.target.value; saveData(); renderDashTodo(); });
@@ -1765,7 +1766,13 @@ function renderTodoDump(){
       tr.querySelector('[data-field=done]').addEventListener('change', e=>{
         if(e.target.checked) completeTodoTask(t.id);
       });
-      tr.querySelector('.icon-btn').addEventListener('click', ()=>{
+      tr.querySelector('.todo-dup-btn').addEventListener('click', ()=>{
+        const idx = DATA.todoDump[week].findIndex(x=>x.id===t.id);
+        const copy = {id:uid(), tag:t.tag, task:t.task, done:false};
+        DATA.todoDump[week].splice(idx+1, 0, copy);
+        saveData(); renderTodoDump(); renderDashTodo();
+      });
+      tr.querySelector('.icon-btn:not(.todo-dup-btn)').addEventListener('click', ()=>{
         DATA.todoDump[week] = DATA.todoDump[week].filter(x=>x.id!==t.id);
         saveData(); renderTodoDump(); renderDashTodo();
       });
