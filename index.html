@@ -625,6 +625,15 @@
         <thead><tr><th style="width:34px;"></th><th style="width:120px;">Tag</th><th>Task</th><th class="chk-cell">Done</th><th class="del-cell"></th></tr></thead>
         <tbody id="todo-next-tbody"></tbody>
       </table>
+
+      <div class="section-divider"><span>Devotionals To Do</span><div class="line"></div></div>
+      <div class="sheet-toolbar">
+        <button class="btn" data-week="devotionals" id="add-todo-devotionals">+ Add Task</button>
+      </div>
+      <table class="sheet">
+        <thead><tr><th style="width:34px;"></th><th style="width:120px;">Tag</th><th>Task</th><th class="chk-cell">Done</th><th class="del-cell"></th></tr></thead>
+        <tbody id="todo-devotionals-tbody"></tbody>
+      </table>
     </div>
 
     <!-- ================= DAILY TASKS SETUP ================= -->
@@ -853,7 +862,7 @@ const DEFAULT_DATA = {
   bigMealDate: '',
   events: [],
   holidaysSeeded: false,
-  todoDump: { this: [], next: [] },
+  todoDump: { this: [], next: [], devotionals: [] },
   dailyRecurring: [], // {id, day(0-6), section, task}
   dailyCompletion: {}, // key: date|taskId -> true
   monthlyCompletion: {}, // key: date|taskId (or year-month|taskId for range rules) -> true
@@ -999,10 +1008,18 @@ function migrateAdhocDaily(){
   });
 }
 
+function migrateTodoDump(){
+  if(!DATA.todoDump) DATA.todoDump = { this: [], next: [], devotionals: [] };
+  if(!Array.isArray(DATA.todoDump.this)) DATA.todoDump.this = [];
+  if(!Array.isArray(DATA.todoDump.next)) DATA.todoDump.next = [];
+  if(!Array.isArray(DATA.todoDump.devotionals)) DATA.todoDump.devotionals = [];
+}
+
 let DATA = loadData();
 migrateFavMeals();
 migrateMealsToArrays();
 migrateAdhocDaily();
+migrateTodoDump();
 migrateIngredientsAndMasterList();
 seedHolidaysIfNeeded();
 seedStockItemsIfNeeded();
@@ -1095,7 +1112,7 @@ function startCloudSync(uid){
       try{
         const remote = JSON.parse(snap.data().data);
         DATA = Object.assign(JSON.parse(JSON.stringify(DEFAULT_DATA)), remote);
-        migrateFavMeals(); migrateMealsToArrays(); migrateAdhocDaily(); migrateIngredientsAndMasterList();
+        migrateFavMeals(); migrateMealsToArrays(); migrateAdhocDaily(); migrateTodoDump(); migrateIngredientsAndMasterList();
         seedHolidaysIfNeeded(); seedStockItemsIfNeeded();
       }catch(e){ console.error('Could not parse cloud data', e); }
     } else {
@@ -1124,7 +1141,7 @@ function startCloudSync(uid){
         const remote = JSON.parse(snap.data().data);
         applyingRemoteUpdate = true;
         DATA = Object.assign(JSON.parse(JSON.stringify(DEFAULT_DATA)), remote);
-        migrateFavMeals(); migrateMealsToArrays(); migrateAdhocDaily(); migrateIngredientsAndMasterList();
+        migrateFavMeals(); migrateMealsToArrays(); migrateAdhocDaily(); migrateTodoDump(); migrateIngredientsAndMasterList();
         seedHolidaysIfNeeded(); seedStockItemsIfNeeded();
         localStorage.setItem(STORE_KEY, JSON.stringify(DATA));
         renderActivePage();
@@ -1722,7 +1739,7 @@ function renderDashEvents(){
    TO-DO DUMP + DASHBOARD 10-SLOT LIST
    ========================================================= */
 function renderTodoDump(){
-  ['this','next'].forEach(week=>{
+  ['this','next','devotionals'].forEach(week=>{
     const tbody = document.getElementById('todo-'+week+'-tbody');
     tbody.innerHTML = '';
     DATA.todoDump[week].forEach(t=>{
@@ -1730,7 +1747,7 @@ function renderTodoDump(){
       tr.dataset.id = t.id;
       if(t.done) tr.classList.add('row-done');
       tr.innerHTML = `
-        <td class="drag-handle" title="Drag to reorder">⠿</td>
+        <td class="drag-handle" title="Drag to reorder or move to This Week / Next Week">⠿</td>
         <td>
           <select class="tag-select" data-field="tag" style="width:100%;border:none;">
             <option value="Home" ${t.tag==='Home'?'selected':''}>Home</option>
@@ -1764,14 +1781,20 @@ document.getElementById('add-todo-next').addEventListener('click', ()=>{
   DATA.todoDump.next.push({id:uid(), tag:'Home', task:'', done:false});
   saveData(); renderTodoDump();
 });
+document.getElementById('add-todo-devotionals').addEventListener('click', ()=>{
+  DATA.todoDump.devotionals.push({id:uid(), tag:'TNF', task:'', done:false});
+  saveData(); renderTodoDump();
+});
 
 function syncTodoListsFromDOM(){
   const thisTbody = document.getElementById('todo-this-tbody');
   const nextTbody = document.getElementById('todo-next-tbody');
-  const allTasks = [...DATA.todoDump.this, ...DATA.todoDump.next];
+  const devTbody = document.getElementById('todo-devotionals-tbody');
+  const allTasks = [...DATA.todoDump.this, ...DATA.todoDump.next, ...DATA.todoDump.devotionals];
   const findTask = id => allTasks.find(t=>t.id===id);
   DATA.todoDump.this = [...thisTbody.children].map(tr=>findTask(tr.dataset.id)).filter(Boolean);
   DATA.todoDump.next = [...nextTbody.children].map(tr=>findTask(tr.dataset.id)).filter(Boolean);
+  DATA.todoDump.devotionals = [...devTbody.children].map(tr=>findTask(tr.dataset.id)).filter(Boolean);
   saveData();
 }
 
@@ -1793,6 +1816,7 @@ function initTodoSortable(week){
 }
 initTodoSortable('this');
 initTodoSortable('next');
+initTodoSortable('devotionals');
 
 /* Quick-add from Dashboard, straight into the To-Do Dump */
 function quickAddTodo(){
@@ -1811,12 +1835,13 @@ document.getElementById('quick-add-btn').addEventListener('click', quickAddTodo)
 document.getElementById('quick-add-task').addEventListener('keydown', e=>{ if(e.key==='Enter') quickAddTodo(); });
 
 function completeTodoTask(id){
-  const t = [...DATA.todoDump.this, ...DATA.todoDump.next].find(x=>x.id===id);
+  const t = [...DATA.todoDump.this, ...DATA.todoDump.next, ...DATA.todoDump.devotionals].find(x=>x.id===id);
   if(!t) return;
   const adhocDay = ensureAdhocDay(DATA.selectedDate);
   adhocDay.push({id:uid(), text:t.task, done:true, section:t.tag, fromTodo:true});
   DATA.todoDump.this = DATA.todoDump.this.filter(x=>x.id!==id);
   DATA.todoDump.next = DATA.todoDump.next.filter(x=>x.id!==id);
+  DATA.todoDump.devotionals = DATA.todoDump.devotionals.filter(x=>x.id!==id);
   saveData();
   renderDashTodo();
   renderTodoDump();
