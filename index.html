@@ -849,6 +849,8 @@ const STORE_KEY = 'tnf_command_center_v1';
 let fbAuth = null, fbDb = null, currentUID = null, cloudSyncReady = false;
 let cloudSaveTimer = null;
 let applyingRemoteUpdate = false;
+let pendingRemoteData = null; // a remote update held back while actively typing; invalidated if a local edit happens first
+let hasPendingLocalSave = false; // true whenever this device has an unconfirmed save in flight to the cloud
 
 function uid(){ return Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4); }
 function pad(n){ return n.toString().padStart(2,'0'); }
@@ -1093,6 +1095,14 @@ function setSyncStatus(state, text){
 
 function queueCloudSave(){
   if(!cloudSyncReady || !currentUID || applyingRemoteUpdate) return;
+  if(pendingRemoteData){
+    // She's editing something and a remote update was already held back once.
+    // That held-back snapshot is now stale relative to this fresh edit, drop it
+    // rather than risk applying it later and overwriting what she just typed.
+    // Her own edit (about to be saved below) will reconcile everything correctly.
+    pendingRemoteData = null;
+  }
+  hasPendingLocalSave = true;
   setSyncStatus('syncing', 'Saving...');
   clearTimeout(cloudSaveTimer);
   cloudSaveTimer = setTimeout(()=>{
@@ -1100,8 +1110,10 @@ function queueCloudSave(){
       data: JSON.stringify(DATA),
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     }).then(()=>{
+      hasPendingLocalSave = false;
       setSyncStatus('synced', 'Synced across your devices');
     }).catch(err=>{
+      hasPendingLocalSave = false;
       console.error('Cloud save failed', err);
       setSyncStatus('offline', 'Saved on this device, will sync when back online');
     });
@@ -1112,6 +1124,7 @@ function startCloudSync(uid){
   currentUID = uid;
   const docRef = fbDb.collection('users').doc(uid);
   let firstSnapshotHandled = false;
+  // (pendingRemoteData is declared once, shared, near the top of the script)
 
   function applyResetToToday(){
     const todayISO = toISO(new Date());
@@ -1125,6 +1138,45 @@ function startCloudSync(uid){
     const active = document.activeElement;
     return !!(active && (active.tagName==='INPUT' || active.tagName==='TEXTAREA') && active.closest('#main-app'));
   }
+
+  function applyRemoteData(rawJson, isFirst){
+    try{
+      const remote = JSON.parse(rawJson);
+      applyingRemoteUpdate = true;
+      DATA = Object.assign(JSON.parse(JSON.stringify(DEFAULT_DATA)), remote);
+      migrateFavMeals(); migrateMealsToArrays(); migrateAdhocDaily(); migrateTodoDump(); migrateIngredientsAndMasterList();
+      seedHolidaysIfNeeded(); seedStockItemsIfNeeded();
+      if(isFirst) applyResetToToday();
+      localStorage.setItem(STORE_KEY, JSON.stringify(DATA));
+      renderActivePage();
+      setSyncStatus('synced', 'Updated from another device');
+    }catch(e){
+      console.error('Could not apply remote update', e);
+      setSyncStatus('offline', 'Had trouble applying an update, your changes are still safe');
+    }finally{
+      applyingRemoteUpdate = false;
+      firstSnapshotHandled = true;
+    }
+  }
+
+  // If a remote update arrives while she's mid-edit, we hold it here instead of
+  // applying it, and pick it back up once she's done (see the focusout listener
+  // below). This is what actually protects in-progress typing, deferring the
+  // whole update, not just the screen redraw.
+  document.addEventListener('focusout', ()=>{
+    if(pendingRemoteData && !isActivelyTyping()){
+      const data = pendingRemoteData;
+      pendingRemoteData = null;
+      if(hasPendingLocalSave){
+        // Her own edit hasn't finished saving to the cloud yet, so this held-back
+        // update is definitely stale relative to what she's about to push. Drop
+        // it rather than apply it; her own save reconciles everything correctly
+        // once it lands.
+        return;
+      }
+      applyRemoteData(data, false);
+    }
+  });
 
   docRef.get().then(snap=>{
     if(snap.exists && snap.data().data){
@@ -1153,36 +1205,14 @@ function startCloudSync(uid){
     docRef.onSnapshot(snap=>{
       if(!snap.exists) return;
       if(snap.metadata.hasPendingWrites) return; // this is our own write echoing back, ignore
-      try{
-        const remote = JSON.parse(snap.data().data);
-        applyingRemoteUpdate = true;
-        DATA = Object.assign(JSON.parse(JSON.stringify(DEFAULT_DATA)), remote);
-        migrateFavMeals(); migrateMealsToArrays(); migrateAdhocDaily(); migrateTodoDump(); migrateIngredientsAndMasterList();
-        seedHolidaysIfNeeded(); seedStockItemsIfNeeded();
-        if(!firstSnapshotHandled){
-          // The very first snapshot after sign-in can arrive with slightly stale data
-          // (a moment before our own save above lands). Re-apply today's date once more
-          // so it never has a chance to flash back to whatever date was last saved.
-          applyResetToToday();
-        }
-        localStorage.setItem(STORE_KEY, JSON.stringify(DATA));
-        if(isActivelyTyping()){
-          // Don't yank the page out from under her mid-keystroke (this is what was
-          // causing typing to get interrupted or characters to vanish). The fresh
-          // data is safely applied in memory either way; the visible page will
-          // catch up next time she navigates or taps out of the field.
-          setSyncStatus('synced', 'Updated from another device');
-        } else {
-          renderActivePage();
-          setSyncStatus('synced', 'Updated from another device');
-        }
-      }catch(e){
-        console.error('Could not apply remote update', e);
-        setSyncStatus('offline', 'Had trouble applying an update, your changes are still safe');
-      }finally{
-        applyingRemoteUpdate = false;
-        firstSnapshotHandled = true;
+      const rawJson = snap.data().data;
+      if(isActivelyTyping()){
+        // Hold this update instead of applying it, don't touch DATA at all while
+        // she's mid-edit, so nothing she just typed can get silently overwritten.
+        pendingRemoteData = rawJson;
+        return;
       }
+      applyRemoteData(rawJson, !firstSnapshotHandled);
     });
   }).catch(err=>{
     console.error('Initial cloud load failed', err);
