@@ -595,6 +595,7 @@
           <th>Event</th>
           <th style="width:230px;">Repeat</th>
           <th style="width:150px;">Who / Business</th>
+          <th style="width:90px;">Year (optional)</th>
           <th class="del-cell"></th>
         </tr></thead>
         <tbody id="events-tbody"></tbody>
@@ -1110,6 +1111,21 @@ function queueCloudSave(){
 function startCloudSync(uid){
   currentUID = uid;
   const docRef = fbDb.collection('users').doc(uid);
+  let firstSnapshotHandled = false;
+
+  function applyResetToToday(){
+    const todayISO = toISO(new Date());
+    DATA.selectedDate = todayISO;
+    const d = new Date();
+    DATA.calViewYear = d.getFullYear();
+    DATA.calViewMonth = d.getMonth();
+  }
+
+  function isActivelyTyping(){
+    const active = document.activeElement;
+    return !!(active && (active.tagName==='INPUT' || active.tagName==='TEXTAREA') && active.closest('#main-app'));
+  }
+
   docRef.get().then(snap=>{
     if(snap.exists && snap.data().data){
       try{
@@ -1122,19 +1138,16 @@ function startCloudSync(uid){
       // first time this account has synced: push whatever is already on this device up
       docRef.set({ data: JSON.stringify(DATA), updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
     }
-    (function resetToToday(){
-      const todayISO = toISO(new Date());
-      DATA.selectedDate = todayISO;
-      const d = new Date();
-      DATA.calViewYear = d.getFullYear();
-      DATA.calViewMonth = d.getMonth();
-    })();
+    applyResetToToday();
     cloudSyncReady = true;
     document.getElementById('auth-loading').style.display = 'none';
     document.getElementById('auth-screen').style.display = 'none';
     document.getElementById('main-app').style.display = 'flex';
     renderActivePage();
     setSyncStatus('synced', 'Synced across your devices');
+    // Persist the corrected date right away so the listener below (which delivers
+    // the current server state the moment it attaches) doesn't silently revert it.
+    queueCloudSave();
 
     // Listen for changes from other devices
     docRef.onSnapshot(snap=>{
@@ -1146,14 +1159,29 @@ function startCloudSync(uid){
         DATA = Object.assign(JSON.parse(JSON.stringify(DEFAULT_DATA)), remote);
         migrateFavMeals(); migrateMealsToArrays(); migrateAdhocDaily(); migrateTodoDump(); migrateIngredientsAndMasterList();
         seedHolidaysIfNeeded(); seedStockItemsIfNeeded();
+        if(!firstSnapshotHandled){
+          // The very first snapshot after sign-in can arrive with slightly stale data
+          // (a moment before our own save above lands). Re-apply today's date once more
+          // so it never has a chance to flash back to whatever date was last saved.
+          applyResetToToday();
+        }
         localStorage.setItem(STORE_KEY, JSON.stringify(DATA));
-        renderActivePage();
-        setSyncStatus('synced', 'Updated from another device');
+        if(isActivelyTyping()){
+          // Don't yank the page out from under her mid-keystroke (this is what was
+          // causing typing to get interrupted or characters to vanish). The fresh
+          // data is safely applied in memory either way; the visible page will
+          // catch up next time she navigates or taps out of the field.
+          setSyncStatus('synced', 'Updated from another device');
+        } else {
+          renderActivePage();
+          setSyncStatus('synced', 'Updated from another device');
+        }
       }catch(e){
         console.error('Could not apply remote update', e);
         setSyncStatus('offline', 'Had trouble applying an update, your changes are still safe');
       }finally{
         applyingRemoteUpdate = false;
+        firstSnapshotHandled = true;
       }
     });
   }).catch(err=>{
@@ -1163,6 +1191,7 @@ function startCloudSync(uid){
     document.getElementById('auth-screen').style.display = 'none';
     document.getElementById('main-app').style.display = 'flex';
     cloudSyncReady = true;
+    applyResetToToday();
     renderActivePage();
   });
 }
@@ -1598,6 +1627,7 @@ function renderEventsTable(){
       <td><input type="text" placeholder="Event name" value="${escapeAttr(ev.title||'')}" data-field="title"></td>
       <td class="ev-repeat-cell"></td>
       <td><input type="text" placeholder="Who / business" value="${escapeAttr(ev.who||'')}" data-field="who"></td>
+      <td><input type="number" placeholder="e.g. 1990" min="1900" max="2100" value="${escapeAttr(ev.refYear||'')}" data-field="refYear" title="Birth year or anniversary year, optional. Shows their age on the Dashboard."></td>
       <td class="del-cell"><button class="icon-btn" title="Delete">✕</button></td>
     `;
     tr.querySelectorAll('input[data-field], select[data-field]').forEach(inp=>{
@@ -1690,7 +1720,7 @@ function renderEventsTable(){
   });
 }
 document.getElementById('add-event-row').addEventListener('click', ()=>{
-  DATA.events.unshift({id:uid(), startDate: DATA.selectedDate, endDate: DATA.selectedDate, time:'', title:'', who:'', repeatType:'none', repeatInterval:2, repeatNth:1, repeatWeekday:1, repeatMonth:0});
+  DATA.events.unshift({id:uid(), startDate: DATA.selectedDate, endDate: DATA.selectedDate, time:'', title:'', who:'', refYear:'', repeatType:'none', repeatInterval:2, repeatNth:1, repeatWeekday:1, repeatMonth:0});
   saveData(); renderEventsTable();
 });
 
@@ -1711,7 +1741,8 @@ function getMonthEvents(year, month){
   DATA.events.forEach(ev=>{
     const occs = getEventOccurrencesForMonth(ev, year, month);
     occs.forEach(occ=>{
-      items.push({start: occ.start, end: occ.end, title: ev.title, who: ev.who, time: ev.time});
+      const age = ev.refYear ? (occ.start.getFullYear() - Number(ev.refYear)) : null;
+      items.push({start: occ.start, end: occ.end, title: ev.title, who: ev.who, time: ev.time, age});
     });
   });
   items.sort((a,b)=>a.start-b.start);
@@ -1730,9 +1761,10 @@ function renderDashEvents(){
       ? monthName(ev.start.getMonth()).slice(0,3)+' '+ev.start.getDate()
       : monthName(ev.start.getMonth()).slice(0,3)+' '+ev.start.getDate()+'\u2013'+monthName(ev.end.getMonth()).slice(0,3)+' '+ev.end.getDate();
     const timeLabel = ev.time ? formatTime(ev.time) : '';
+    const ageLabel = (ev.age !== null && ev.age >= 0) ? ' <span style="color:var(--purple);font-weight:700;">(turning '+ev.age+')</span>' : '';
     return `<div class="event-row">
       <div class="event-date">${dateLabel}${timeLabel?'<br><span style="font-weight:400;color:var(--slate);">'+timeLabel+'</span>':''}</div>
-      <div class="event-title">${escapeHTML(ev.title)}</div>
+      <div class="event-title">${escapeHTML(ev.title)}${ageLabel}</div>
       <div class="event-badge">${escapeHTML(ev.who||'')}</div>
     </div>`;
   }).join('');
