@@ -2153,6 +2153,7 @@ function renderMonthlyYearly(){
           <option value="dayOfMonth" ${t.ruleType==='dayOfMonth'?'selected':''}>Day #</option>
           <option value="nthWeekday" ${t.ruleType==='nthWeekday'?'selected':''}>Nth Weekday</option>
           <option value="lastWeek" ${t.ruleType==='lastWeek'?'selected':''}>Last Week of Month</option>
+          <option value="weeks" ${t.ruleType==='weeks'?'selected':''}>Every N Weeks</option>
         </select>
       </div>
       <div class="rule-detail" style="padding:0 8px 6px 8px;"></div>
@@ -2170,20 +2171,32 @@ function renderMonthlyYearly(){
         `;
       } else if(t.ruleType==='lastWeek'){
         detail.innerHTML = `<span style="font-size:11.5px;color:var(--slate);">Any day in the final 7 days of the month</span>`;
+      } else if(t.ruleType==='weeks'){
+        const weekdayLabel = t.weeksAnchor ? dayName(fromISO(t.weeksAnchor).getDay()) : '';
+        detail.innerHTML = `
+          <input type="date" data-field="weeksAnchor" value="${t.weeksAnchor||''}" style="border:1px solid var(--border);border-radius:6px;font-size:12px;padding:3px 4px;margin-right:4px;">
+          <span style="font-size:11.5px;color:var(--slate);">every</span>
+          <input type="number" min="1" max="52" value="${t.weeksInterval||2}" data-field="weeksInterval" style="width:40px;border:1px solid var(--border);border-radius:6px;font-size:12px;padding:3px 4px;margin:0 3px;">
+          <span style="font-size:11.5px;color:var(--slate);">week(s)${weekdayLabel?' on '+weekdayLabel:''}</span>
+        `;
       } else {
         detail.innerHTML = `<input type="number" min="1" max="31" placeholder="Day (1-31)" value="${t.day||''}" data-field="day" style="width:80px;border:1px solid var(--border);border-radius:6px;font-size:12px;padding:3px 6px;">`;
       }
       detail.querySelectorAll('[data-field]').forEach(inp=>{
         inp.addEventListener('change', e=>{
           const f = inp.dataset.field;
-          t[f] = f==='day' ? Number(e.target.value) : (f==='nth' ? Number(e.target.value) : Number(e.target.value));
-          saveData(); renderDashMonthlyYearly();
+          t[f] = f==='weeksAnchor' ? e.target.value : Number(e.target.value);
+          saveData(); renderRuleDetail(); renderDashMonthlyYearly();
         });
       });
     }
     renderRuleDetail();
     whenCell.querySelector('[data-field=ruleType]').addEventListener('change', e=>{
       t.ruleType = e.target.value;
+      if(t.ruleType==='weeks' && !t.weeksAnchor){
+        t.weeksAnchor = DATA.selectedDate;
+        t.weeksInterval = 2;
+      }
       saveData(); renderRuleDetail(); renderDashMonthlyYearly();
     });
 
@@ -2229,6 +2242,31 @@ function getMonthOccurrences(year, month){
   const items = [];
   DATA.monthlyYearly.forEach(t=>{
     if(!t.task || t.task.trim()==='') return;
+
+    if(t.ruleType==='weeks'){
+      if(!t.weeksAnchor) return;
+      const anchor = fromISO(t.weeksAnchor);
+      const interval = Math.max(1, t.weeksInterval || 2);
+      const stepDays = interval * 7;
+      const monthStart = new Date(year, month, 1);
+      const monthEnd = new Date(year, month+1, 0);
+      if(anchor <= monthEnd){
+        const diffDays = Math.round((monthStart - anchor) / 86400000);
+        let k = Math.floor(diffDays / stepDays);
+        if(k < 0) k = 0;
+        let occ = addDays(anchor, k*stepDays);
+        let guard = 0;
+        while(occ <= monthEnd && guard < 10){
+          if(occ >= anchor && occ >= monthStart){
+            items.push({id: t.id, date: new Date(occ), task: t.task, section: t.section, type: t.type});
+          }
+          occ = addDays(occ, stepDays);
+          guard++;
+        }
+      }
+      return;
+    }
+
     if(t.type==='yearly' && t.month !== month) return;
     if(t.ruleType==='lastWeek'){
       const lastDay = new Date(year, month+1, 0).getDate();
