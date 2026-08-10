@@ -1,6 +1,6 @@
 // Command Center offline caching
 // Bump CACHE_NAME whenever a new version is deployed so old caches get cleaned up.
-const CACHE_NAME = 'command-center-v1';
+const CACHE_NAME = 'command-center-v2';
 
 const CORE_ASSETS = [
   './',

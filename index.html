@@ -1118,12 +1118,25 @@ function queueCloudSave(){
     }).then(()=>{
       hasPendingLocalSave = false;
       setSyncStatus('synced', 'Synced across your devices');
+      // Any snapshot that was held back purely because this save was still in
+      // flight is now guaranteed stale relative to what we just wrote (it can
+      // only reflect a state from before this save), so discard it rather than
+      // apply it - applying it here would silently undo the save that just
+      // succeeded. If she's mid-typing, leave it for the focusout handler.
+      if(pendingRemoteData && !isActivelyTyping()){
+        pendingRemoteData = null;
+      }
     }).catch(err=>{
       hasPendingLocalSave = false;
       console.error('Cloud save failed', err);
       setSyncStatus('offline', 'Saved on this device, will sync when back online');
     });
   }, 900);
+}
+
+function isActivelyTyping(){
+  const active = document.activeElement;
+  return !!(active && (active.tagName==='INPUT' || active.tagName==='TEXTAREA') && active.closest('#main-app'));
 }
 
 function startCloudSync(uid){
@@ -1138,11 +1151,6 @@ function startCloudSync(uid){
     const d = new Date();
     DATA.calViewYear = d.getFullYear();
     DATA.calViewMonth = d.getMonth();
-  }
-
-  function isActivelyTyping(){
-    const active = document.activeElement;
-    return !!(active && (active.tagName==='INPUT' || active.tagName==='TEXTAREA') && active.closest('#main-app'));
   }
 
   function applyRemoteData(rawJson, isFirst){
@@ -1177,7 +1185,7 @@ function startCloudSync(uid){
         // Her own edit hasn't finished saving to the cloud yet, so this held-back
         // update is definitely stale relative to what she's about to push. Drop
         // it rather than apply it; her own save reconciles everything correctly
-        // once it lands.
+        // once it lands (see the discard in queueCloudSave's success handler).
         return;
       }
       applyRemoteData(data, false);
@@ -1212,9 +1220,15 @@ function startCloudSync(uid){
       if(!snap.exists) return;
       if(snap.metadata.hasPendingWrites) return; // this is our own write echoing back, ignore
       const rawJson = snap.data().data;
-      if(isActivelyTyping()){
-        // Hold this update instead of applying it, don't touch DATA at all while
-        // she's mid-edit, so nothing she just typed can get silently overwritten.
+      if(isActivelyTyping() || hasPendingLocalSave){
+        // Either she's mid-edit, or this device already has a newer local change
+        // queued or in flight to the cloud (e.g. a fast second tap on a +/- button
+        // before the first tap's save confirmed). This snapshot reflects a state
+        // that predates what's about to be saved, so hold it instead of applying
+        // it immediately - otherwise it can silently knock a counter back down
+        // right after a fast tap. It gets discarded once the pending save lands
+        // (our own save is more current), or applied on focusout if nothing was
+        // actually in flight.
         pendingRemoteData = rawJson;
         return;
       }
