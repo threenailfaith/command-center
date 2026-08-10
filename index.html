@@ -379,6 +379,11 @@
   .grocery-item.done .grocery-item-name{text-decoration:line-through;color:var(--slate-light);}
   .grocery-item:last-child{border-bottom:none;}
   .grocery-count{font-weight:700;color:var(--purple);font-size:12px;flex-shrink:0;}
+  .grocery-qty-input{width:44px;flex-shrink:0;font-weight:700;color:var(--purple);font-size:12.5px;border:1px solid var(--border);border-radius:6px;padding:2px 4px;text-align:center;}
+  .grocery-qty-input:focus{outline:none;border-color:var(--purple);background:var(--purple-bg);}
+  .grocery-unit-suffix{font-size:11px;color:var(--slate);flex-shrink:0;margin-left:-4px;}
+  .grocery-reset-btn{font-size:13px;color:var(--slate-light);flex-shrink:0;padding:2px 4px;}
+  .grocery-reset-btn:hover{color:var(--purple);}
   .grocery-extra span{flex:1;}
   .grocery-empty{font-size:12.5px;color:var(--slate-light);font-style:italic;padding:4px 0;}
   .grocery-add-row{display:flex;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);}
@@ -885,6 +890,7 @@ const DEFAULT_DATA = {
   favMeals: { 'Sunday / Saturday':[], 'Monday':[], 'Tuesday / Thursday':[], 'Wednesday':[], 'Friday':[], 'Sometimes':[], 'Smoked':[], 'Winter / Crockpot':[] },
   groceryExtras: {}, // category -> [{id, name}]
   groceryCompletion: {}, // key: 'year-month|category|itemname|unit' -> true
+  groceryOverrides: {}, // same key -> manually adjusted quantity number
   masterIngredients: {}, // category -> [{id, name}]
   stockItems: [], // [{id, name, category}]
   stockItemsSeeded: false,
@@ -2998,6 +3004,14 @@ function renderGroceryList(){
     if(it.count > 0) parts.push(it.count+'x');
     return parts.join(' + ');
   }
+  function computedNumber(it){
+    return it.qty > 0 ? it.qty : it.count;
+  }
+  function unitSuffix(it){
+    if(it.qty > 0) return it.unit || '';
+    if(it.count > 0) return 'x';
+    return '';
+  }
 
   container.innerHTML = sortedCats.map(cat=>{
     const items = Object.values(categoryMap[cat]||{}).sort((a,b)=>a.name.localeCompare(b.name));
@@ -3010,10 +3024,16 @@ function renderGroceryList(){
           ${items.map(it=>{
             const key = monthKey+'|'+cat+'|'+it.name.trim().toLowerCase()+'|'+(it.unit||'');
             const done = !!DATA.groceryCompletion[key];
-            const amt = amountLabel(it);
+            const hasOverride = DATA.groceryOverrides.hasOwnProperty(key);
+            const shownNum = hasOverride ? DATA.groceryOverrides[key] : computedNumber(it);
+            const suffix = unitSuffix(it);
+            const showQtyControls = computedNumber(it) > 0 || hasOverride;
             return `<div class="grocery-item ${done?'done':''}" data-key="${escapeAttr(key)}">
               <input type="checkbox" ${done?'checked':''}>
-              ${amt ? '<span class="grocery-count">'+amt+'</span> ' : ''}<span class="grocery-item-name">${escapeHTML(it.name)}</span>
+              ${showQtyControls ? `<input type="number" class="grocery-qty-input" min="0" step="0.25" value="${shownNum}" title="Edit if you already have some on hand">` : ''}
+              ${suffix ? '<span class="grocery-unit-suffix">'+escapeHTML(suffix)+'</span>' : ''}
+              <span class="grocery-item-name">${escapeHTML(it.name)}</span>
+              ${hasOverride ? '<button class="icon-btn small-x grocery-reset-btn" title="Reset to calculated amount">\u21ba</button>' : ''}
             </div>`;
           }).join('')}
           ${extras.map(ex=>{
@@ -3037,6 +3057,28 @@ function renderGroceryList(){
     cb.addEventListener('change', ()=>{
       const key = cb.closest('.grocery-item').dataset.key;
       if(cb.checked) DATA.groceryCompletion[key] = true; else delete DATA.groceryCompletion[key];
+      saveData(); renderGroceryList();
+    });
+  });
+
+  container.querySelectorAll('.grocery-qty-input').forEach(inp=>{
+    inp.addEventListener('input', ()=>{
+      const key = inp.closest('.grocery-item').dataset.key;
+      if(inp.value === ''){
+        delete DATA.groceryOverrides[key];
+      } else {
+        DATA.groceryOverrides[key] = Number(inp.value);
+      }
+      saveData();
+      // Not re-rendering on every keystroke so the field she's actively editing
+      // doesn't get pulled out from under her; the reset button will catch up
+      // to reflect the override next time the page renders.
+    });
+  });
+  container.querySelectorAll('.grocery-reset-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const key = btn.closest('.grocery-item').dataset.key;
+      delete DATA.groceryOverrides[key];
       saveData(); renderGroceryList();
     });
   });
