@@ -385,6 +385,8 @@
   .grocery-reset-btn{font-size:13px;color:var(--slate-light);flex-shrink:0;padding:2px 4px;}
   .grocery-reset-btn:hover{color:var(--purple);}
   .grocery-extra span{flex:1;}
+  .grocery-extra-qty-input{width:58px;flex-shrink:0;font-weight:700;color:var(--purple);font-size:12.5px;border:1px solid var(--border);border-radius:6px;padding:2px 4px;text-align:center;}
+  .grocery-extra-qty-input:focus{outline:none;border-color:var(--purple);background:var(--purple-bg);}
   .grocery-empty{font-size:12.5px;color:var(--slate-light);font-style:italic;padding:4px 0;}
   .grocery-add-row{display:flex;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);}
   .grocery-add-row input{flex:1;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12.5px;}
@@ -856,6 +858,13 @@ let cloudSaveTimer = null;
 let applyingRemoteUpdate = false;
 let pendingRemoteData = null; // a remote update held back while actively typing; invalidated if a local edit happens first
 let hasPendingLocalSave = false; // true whenever this device has an unconfirmed save in flight to the cloud
+let lastWrittenDataJson = null; // the exact JSON payload this device most recently sent to Firestore, so we can
+                                  // recognize our own write's server-ack echo (which arrives as a "real" snapshot
+                                  // event once the serverTimestamp resolves) and not misread it as a genuine
+                                  // change from another device
+let tryApplyPendingRemoteFn = null; // set inside startCloudSync; queueCloudSave calls this once its own save
+                                     // settles, so a genuinely-held-back remote update (from hasPendingLocalSave,
+                                     // see below) gets applied promptly instead of only on the next focusout
 
 function uid(){ return Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4); }
 function pad(n){ return n.toString().padStart(2,'0'); }
@@ -1112,12 +1121,15 @@ function queueCloudSave(){
   setSyncStatus('syncing', 'Saving...');
   clearTimeout(cloudSaveTimer);
   cloudSaveTimer = setTimeout(()=>{
+    const payload = JSON.stringify(DATA);
+    lastWrittenDataJson = payload;
     fbDb.collection('users').doc(currentUID).set({
-      data: JSON.stringify(DATA),
+      data: payload,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     }).then(()=>{
       hasPendingLocalSave = false;
       setSyncStatus('synced', 'Synced across your devices');
+      if(tryApplyPendingRemoteFn) tryApplyPendingRemoteFn();
     }).catch(err=>{
       hasPendingLocalSave = false;
       console.error('Cloud save failed', err);
@@ -1142,7 +1154,11 @@ function startCloudSync(uid){
 
   function isActivelyTyping(){
     const active = document.activeElement;
-    return !!(active && (active.tagName==='INPUT' || active.tagName==='TEXTAREA') && active.closest('#main-app'));
+    // Covers text/number inputs, textareas, AND selects/buttons — any element she could be
+    // mid-interaction with (e.g. the ingredient-picker dropdown, a +/- intake button), not
+    // just text fields. Applying a remote update mid-interaction with any of these is what
+    // was causing the intake counter to revert and the ingredient panel to close.
+    return !!(active && (active.tagName==='INPUT' || active.tagName==='TEXTAREA' || active.tagName==='SELECT' || active.tagName==='BUTTON') && active.closest('#main-app'));
   }
 
   function applyRemoteData(rawJson, isFirst){
@@ -1167,22 +1183,24 @@ function startCloudSync(uid){
 
   // If a remote update arrives while she's mid-edit, we hold it here instead of
   // applying it, and pick it back up once she's done (see the focusout listener
-  // below). This is what actually protects in-progress typing, deferring the
-  // whole update, not just the screen redraw.
-  document.addEventListener('focusout', ()=>{
-    if(pendingRemoteData && !isActivelyTyping()){
-      const data = pendingRemoteData;
+  // and tryApplyPendingRemoteFn below). This is what actually protects
+  // in-progress interaction, deferring the whole update, not just the screen redraw.
+  function tryApplyPendingRemote(){
+    if(!pendingRemoteData || isActivelyTyping()) return;
+    if(hasPendingLocalSave){
+      // Her own edit hasn't finished saving to the cloud yet, so this held-back
+      // update is definitely stale relative to what she's about to push. Drop
+      // it rather than apply it; her own save reconciles everything correctly
+      // once it lands (and once it does, queueCloudSave calls this again).
       pendingRemoteData = null;
-      if(hasPendingLocalSave){
-        // Her own edit hasn't finished saving to the cloud yet, so this held-back
-        // update is definitely stale relative to what she's about to push. Drop
-        // it rather than apply it; her own save reconciles everything correctly
-        // once it lands.
-        return;
-      }
-      applyRemoteData(data, false);
+      return;
     }
-  });
+    const data = pendingRemoteData;
+    pendingRemoteData = null;
+    applyRemoteData(data, false);
+  }
+  tryApplyPendingRemoteFn = tryApplyPendingRemote;
+  document.addEventListener('focusout', tryApplyPendingRemote);
 
   docRef.get().then(snap=>{
     if(snap.exists && snap.data().data){
@@ -1212,9 +1230,19 @@ function startCloudSync(uid){
       if(!snap.exists) return;
       if(snap.metadata.hasPendingWrites) return; // this is our own write echoing back, ignore
       const rawJson = snap.data().data;
-      if(isActivelyTyping()){
-        // Hold this update instead of applying it, don't touch DATA at all while
-        // she's mid-edit, so nothing she just typed can get silently overwritten.
+      if(rawJson === lastWrittenDataJson){
+        // This is the server's confirmation of a write THIS device already made — the content
+        // is identical, only the serverTimestamp field resolved, which fires a second snapshot
+        // event even though nothing meaningful changed. Treating this as a "real" remote update
+        // was the root cause of the intake counter reverting and the ingredient panel closing
+        // itself: it would reapply slightly-stale data over whatever she'd just done next.
+        return;
+      }
+      if(isActivelyTyping() || hasPendingLocalSave){
+        // Hold this update instead of applying it, don't touch DATA at all while she's
+        // mid-edit (any input/select/button) or while our own save is still in flight,
+        // so nothing she just did can get silently overwritten. Picked back up by
+        // tryApplyPendingRemoteFn (once our save settles) or on focusout.
         pendingRemoteData = rawJson;
         return;
       }
@@ -2900,7 +2928,7 @@ function renderStockList(){
       if(!DATA.groceryExtras[item.category]) DATA.groceryExtras[item.category] = [];
       if(e.target.checked){
         const already = DATA.groceryExtras[item.category].some(x=>x.id===id);
-        if(!already) DATA.groceryExtras[item.category].push({id, name:item.name});
+        if(!already) DATA.groceryExtras[item.category].push({id, name:item.name, qty:''});
         showToast('"'+item.name+'" added to your Grocery List.');
       } else {
         DATA.groceryExtras[item.category] = DATA.groceryExtras[item.category].filter(x=>x.id!==id);
@@ -3041,6 +3069,7 @@ function renderGroceryList(){
             const done = !!DATA.groceryCompletion[key];
             return `<div class="grocery-item grocery-extra ${done?'done':''}" data-key="${escapeAttr(key)}" data-id="${ex.id}">
               <input type="checkbox" ${done?'checked':''}>
+              <input type="text" class="grocery-extra-qty-input" placeholder="Qty" value="${escapeAttr(ex.qty||'')}">
               <span class="grocery-item-name">${escapeHTML(ex.name)}</span>
               <button class="icon-btn small-x grocery-extra-del">✕</button>
             </div>`;
@@ -3092,13 +3121,22 @@ function renderGroceryList(){
         saveData(); renderGroceryList();
       });
     });
+    wrap.querySelectorAll('.grocery-extra-qty-input').forEach(inp=>{
+      inp.addEventListener('input', ()=>{
+        const id = inp.closest('.grocery-extra').dataset.id;
+        const ex = (DATA.groceryExtras[cat]||[]).find(x=>x.id===id);
+        if(ex){ ex.qty = inp.value; saveData(); }
+        // Not re-rendering on every keystroke, same reasoning as the regular
+        // item qty field: don't pull the box out from under her while typing.
+      });
+    });
     const input = wrap.querySelector('.grocery-extra-input');
     const addBtn = wrap.querySelector('.grocery-extra-add');
     function addExtra(){
       const val = input.value.trim();
       if(!val) return;
       if(!DATA.groceryExtras[cat]) DATA.groceryExtras[cat] = [];
-      DATA.groceryExtras[cat].push({id:uid(), name:val});
+      DATA.groceryExtras[cat].push({id:uid(), name:val, qty:''});
       input.value = '';
       saveData(); renderGroceryList();
     }
