@@ -377,6 +377,7 @@
   .grocery-item input[type=checkbox]{width:15px;height:15px;accent-color:var(--navy);cursor:pointer;flex-shrink:0;}
   .grocery-item-name{flex:1;}
   .grocery-item.done .grocery-item-name{text-decoration:line-through;color:var(--slate-light);}
+  .grocery-item.have .grocery-item-name{text-decoration:line-through;color:#1a1a1a;}
   .grocery-item:last-child{border-bottom:none;}
   .grocery-count{font-weight:700;color:var(--purple);font-size:12px;flex-shrink:0;}
   .grocery-qty-input{width:58px;flex-shrink:0;font-weight:700;color:var(--purple);font-size:12.5px;border:1px solid var(--border);border-radius:6px;padding:2px 4px;text-align:center;}
@@ -898,7 +899,8 @@ const DEFAULT_DATA = {
   electrolytes: {}, // 'YYYY-MM-DD': count
   favMeals: { 'Sunday / Saturday':[], 'Monday':[], 'Tuesday / Thursday':[], 'Wednesday':[], 'Friday':[], 'Sometimes':[], 'Smoked':[], 'Winter / Crockpot':[] },
   groceryExtras: {}, // category -> [{id, name}]
-  groceryCompletion: {}, // key: 'year-month|category|itemname|unit' -> true
+  groceryCompletion: {}, // key: 'year-month|category|itemname|unit' -> true (checked off while actually shopping)
+  groceryHaveAtHome: {}, // same key -> true (checked ahead of time: already have this at home, separate from shopping progress)
   groceryOverrides: {}, // same key -> manually adjusted quantity number
   masterIngredients: {}, // category -> [{id, name}]
   stockItems: [], // [{id, name, category}]
@@ -3052,25 +3054,29 @@ function renderGroceryList(){
           ${items.map(it=>{
             const key = monthKey+'|'+cat+'|'+it.name.trim().toLowerCase()+'|'+(it.unit||'');
             const done = !!DATA.groceryCompletion[key];
+            const have = !!DATA.groceryHaveAtHome[key];
             const hasOverride = DATA.groceryOverrides.hasOwnProperty(key);
             const shownNum = hasOverride ? DATA.groceryOverrides[key] : computedNumber(it);
             const suffix = unitSuffix(it);
             const showQtyControls = computedNumber(it) > 0 || hasOverride;
-            return `<div class="grocery-item ${done?'done':''}" data-key="${escapeAttr(key)}">
-              <input type="checkbox" ${done?'checked':''}>
+            return `<div class="grocery-item ${done?'done':''} ${have?'have':''}" data-key="${escapeAttr(key)}">
+              <input type="checkbox" class="grocery-check" ${done?'checked':''} title="Check off while shopping">
               ${showQtyControls ? `<input type="number" class="grocery-qty-input" min="0" step="0.25" value="${shownNum}" title="Edit if you already have some on hand">` : ''}
               ${suffix ? '<span class="grocery-unit-suffix">'+escapeHTML(suffix)+'</span>' : ''}
               <span class="grocery-item-name">${escapeHTML(it.name)}</span>
               ${hasOverride ? '<button class="icon-btn small-x grocery-reset-btn" title="Reset to calculated amount">\u21ba</button>' : ''}
+              <input type="checkbox" class="grocery-have-checkbox" ${have?'checked':''} title="Already have this at home">
             </div>`;
           }).join('')}
           ${extras.map(ex=>{
             const key = monthKey+'|'+cat+'|extra:'+ex.id;
             const done = !!DATA.groceryCompletion[key];
-            return `<div class="grocery-item grocery-extra ${done?'done':''}" data-key="${escapeAttr(key)}" data-id="${ex.id}">
-              <input type="checkbox" ${done?'checked':''}>
+            const have = !!DATA.groceryHaveAtHome[key];
+            return `<div class="grocery-item grocery-extra ${done?'done':''} ${have?'have':''}" data-key="${escapeAttr(key)}" data-id="${ex.id}">
+              <input type="checkbox" class="grocery-check" ${done?'checked':''} title="Check off while shopping">
               <input type="text" class="grocery-extra-qty-input" placeholder="Qty" value="${escapeAttr(ex.qty||'')}">
               <span class="grocery-item-name">${escapeHTML(ex.name)}</span>
+              <input type="checkbox" class="grocery-have-checkbox" ${have?'checked':''} title="Already have this at home">
               <button class="icon-btn small-x grocery-extra-del">✕</button>
             </div>`;
           }).join('')}
@@ -3082,10 +3088,18 @@ function renderGroceryList(){
       </div>`;
   }).join('');
 
-  container.querySelectorAll('.grocery-item input[type=checkbox]').forEach(cb=>{
+  container.querySelectorAll('.grocery-item .grocery-check').forEach(cb=>{
     cb.addEventListener('change', ()=>{
       const key = cb.closest('.grocery-item').dataset.key;
       if(cb.checked) DATA.groceryCompletion[key] = true; else delete DATA.groceryCompletion[key];
+      saveData(); renderGroceryList();
+    });
+  });
+
+  container.querySelectorAll('.grocery-item .grocery-have-checkbox').forEach(cb=>{
+    cb.addEventListener('change', ()=>{
+      const key = cb.closest('.grocery-item').dataset.key;
+      if(cb.checked) DATA.groceryHaveAtHome[key] = true; else delete DATA.groceryHaveAtHome[key];
       saveData(); renderGroceryList();
     });
   });
@@ -3161,6 +3175,9 @@ document.getElementById('clear-grocery-btn').addEventListener('click', ()=>{
     const monthKey = y+'-'+pad(m+1)+'|';
     Object.keys(DATA.groceryCompletion).forEach(key=>{
       if(key.startsWith(monthKey)) delete DATA.groceryCompletion[key];
+    });
+    Object.keys(DATA.groceryHaveAtHome).forEach(key=>{
+      if(key.startsWith(monthKey)) delete DATA.groceryHaveAtHome[key];
     });
     DATA.groceryExtras = {};
     saveData();
