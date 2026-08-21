@@ -863,9 +863,14 @@ let lastWrittenDataJson = null; // the exact JSON payload this device most recen
                                   // recognize our own write's server-ack echo (which arrives as a "real" snapshot
                                   // event once the serverTimestamp resolves) and not misread it as a genuine
                                   // change from another device
-let tryApplyPendingRemoteFn = null; // set inside startCloudSync; queueCloudSave calls this once its own save
-                                     // settles, so a genuinely-held-back remote update (from hasPendingLocalSave,
-                                     // see below) gets applied promptly instead of only on the next focusout
+let tryApplyPendingRemoteFn = null; // set inside startCloudSync; used on focusout to apply a
+                                     // genuinely-held-back remote update once she's done interacting
+let discardStalePendingRemoteFn = null; // set inside startCloudSync; called the moment OUR OWN save
+                                         // settles, so any remote snapshot that got held back WHILE
+                                         // that save was in flight gets dropped, not reapplied — it
+                                         // necessarily predates what we just wrote, and reapplying it
+                                         // was silently reverting the just-saved change (wrong date on
+                                         // sign-in, cleared items reappearing, etc.)
 
 function uid(){ return Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4); }
 function pad(n){ return n.toString().padStart(2,'0'); }
@@ -898,7 +903,7 @@ const DEFAULT_DATA = {
   liquidIV: {}, // 'YYYY-MM-DD': count
   electrolytes: {}, // 'YYYY-MM-DD': count
   favMeals: { 'Sunday / Saturday':[], 'Monday':[], 'Tuesday / Thursday':[], 'Wednesday':[], 'Friday':[], 'Sometimes':[], 'Smoked':[], 'Winter / Crockpot':[] },
-  groceryExtras: {}, // category -> [{id, name}]
+  groceryExtras: {}, // category -> [{id, name, qty, addedMonth:'YYYY-MM'}] (older entries may lack addedMonth; those show/clear on every month, same as before this field existed)
   groceryCompletion: {}, // key: 'year-month|category|itemname|unit' -> true (checked off while actually shopping)
   groceryHaveAtHome: {}, // same key -> true (checked ahead of time: already have this at home, separate from shopping progress)
   groceryOverrides: {}, // same key -> manually adjusted quantity number
@@ -1131,7 +1136,7 @@ function queueCloudSave(){
     }).then(()=>{
       hasPendingLocalSave = false;
       setSyncStatus('synced', 'Synced across your devices');
-      if(tryApplyPendingRemoteFn) tryApplyPendingRemoteFn();
+      if(discardStalePendingRemoteFn) discardStalePendingRemoteFn();
     }).catch(err=>{
       hasPendingLocalSave = false;
       console.error('Cloud save failed', err);
@@ -1185,15 +1190,15 @@ function startCloudSync(uid){
 
   // If a remote update arrives while she's mid-edit, we hold it here instead of
   // applying it, and pick it back up once she's done (see the focusout listener
-  // and tryApplyPendingRemoteFn below). This is what actually protects
-  // in-progress interaction, deferring the whole update, not just the screen redraw.
+  // below). This is what actually protects in-progress interaction, deferring the
+  // whole update, not just the screen redraw.
   function tryApplyPendingRemote(){
     if(!pendingRemoteData || isActivelyTyping()) return;
     if(hasPendingLocalSave){
       // Her own edit hasn't finished saving to the cloud yet, so this held-back
       // update is definitely stale relative to what she's about to push. Drop
       // it rather than apply it; her own save reconciles everything correctly
-      // once it lands (and once it does, queueCloudSave calls this again).
+      // once it lands.
       pendingRemoteData = null;
       return;
     }
@@ -1203,6 +1208,17 @@ function startCloudSync(uid){
   }
   tryApplyPendingRemoteFn = tryApplyPendingRemote;
   document.addEventListener('focusout', tryApplyPendingRemote);
+
+  function discardStalePendingRemote(){
+    // Called right when OUR OWN save finishes landing. Whatever the server's state was
+    // WHILE that save was still in flight (the only reason anything would be sitting in
+    // pendingRemoteData right now) is necessarily older than what we just wrote. Applying
+    // it here would silently revert the change we just made — that's exactly what was
+    // reopening the dashboard on the wrong date after sign-in, and what made "Clear" on
+    // the Grocery List look like it hadn't removed anything. Just drop it.
+    pendingRemoteData = null;
+  }
+  discardStalePendingRemoteFn = discardStalePendingRemote;
 
   docRef.get().then(snap=>{
     if(snap.exists && snap.data().data){
@@ -2906,7 +2922,7 @@ function renderStockList(){
         ${items.map(it=>{
           const inStockKey = monthKey+'|'+it.id;
           const inStock = !!DATA.stockInStock[inStockKey];
-          const needIt = (DATA.groceryExtras[it.category]||[]).some(x=>x.id===it.id);
+          const needIt = (DATA.groceryExtras[it.category]||[]).some(x=>x.id===it.id && x.addedMonth===monthKey);
           return `<div class="stock-row" data-id="${it.id}">
             <span class="stock-row-name">${escapeHTML(it.name)}</span>
             <label class="stock-check"><input type="checkbox" class="stock-instock" ${inStock?'checked':''}> In Stock</label>
@@ -2929,12 +2945,12 @@ function renderStockList(){
     row.querySelector('.stock-needit').addEventListener('change', e=>{
       if(!DATA.groceryExtras[item.category]) DATA.groceryExtras[item.category] = [];
       if(e.target.checked){
-        const already = DATA.groceryExtras[item.category].some(x=>x.id===id);
-        if(!already) DATA.groceryExtras[item.category].push({id, name:item.name, qty:''});
-        showToast('"'+item.name+'" added to your Grocery List.');
+        const already = DATA.groceryExtras[item.category].some(x=>x.id===id && x.addedMonth===monthKey);
+        if(!already) DATA.groceryExtras[item.category].push({id, name:item.name, qty:'', addedMonth: monthKey});
+        showToast('"'+item.name+'" added to your Grocery List for '+monthName(m)+'.');
       } else {
-        DATA.groceryExtras[item.category] = DATA.groceryExtras[item.category].filter(x=>x.id!==id);
-        showToast('"'+item.name+'" removed from your Grocery List.');
+        DATA.groceryExtras[item.category] = DATA.groceryExtras[item.category].filter(x=>!(x.id===id && x.addedMonth===monthKey));
+        showToast('"'+item.name+'" removed from your Grocery List for '+monthName(m)+'.');
       }
       saveData();
     });
@@ -3045,7 +3061,10 @@ function renderGroceryList(){
 
   container.innerHTML = sortedCats.map(cat=>{
     const items = Object.values(categoryMap[cat]||{}).sort((a,b)=>a.name.localeCompare(b.name));
-    const extras = DATA.groceryExtras[cat] || [];
+    // Only show extras that belong to THIS month (or older, never-tagged extras from before
+    // months were tracked) — otherwise an item added while shopping in August would keep
+    // showing up on every future month's list too.
+    const extras = (DATA.groceryExtras[cat] || []).filter(ex => !ex.addedMonth || ex.addedMonth === monthKey);
     return `
       <div class="grocery-cat" data-cat="${escapeAttr(cat)}">
         <h3>${cat}</h3>
@@ -3131,14 +3150,14 @@ function renderGroceryList(){
     wrap.querySelectorAll('.grocery-extra-del').forEach(btn=>{
       btn.addEventListener('click', ()=>{
         const id = btn.closest('.grocery-extra').dataset.id;
-        DATA.groceryExtras[cat] = (DATA.groceryExtras[cat]||[]).filter(x=>x.id!==id);
+        DATA.groceryExtras[cat] = (DATA.groceryExtras[cat]||[]).filter(x=>!(x.id===id && (!x.addedMonth || x.addedMonth===monthKey)));
         saveData(); renderGroceryList();
       });
     });
     wrap.querySelectorAll('.grocery-extra-qty-input').forEach(inp=>{
       inp.addEventListener('input', ()=>{
         const id = inp.closest('.grocery-extra').dataset.id;
-        const ex = (DATA.groceryExtras[cat]||[]).find(x=>x.id===id);
+        const ex = (DATA.groceryExtras[cat]||[]).find(x=>x.id===id && (!x.addedMonth || x.addedMonth===monthKey));
         if(ex){ ex.qty = inp.value; saveData(); }
         // Not re-rendering on every keystroke, same reasoning as the regular
         // item qty field: don't pull the box out from under her while typing.
@@ -3150,7 +3169,7 @@ function renderGroceryList(){
       const val = input.value.trim();
       if(!val) return;
       if(!DATA.groceryExtras[cat]) DATA.groceryExtras[cat] = [];
-      DATA.groceryExtras[cat].push({id:uid(), name:val, qty:''});
+      DATA.groceryExtras[cat].push({id:uid(), name:val, qty:'', addedMonth: monthKey});
       input.value = '';
       saveData(); renderGroceryList();
     }
@@ -3170,19 +3189,25 @@ document.getElementById('print-grocery-btn').addEventListener('click', ()=>{
   window.print();
 });
 document.getElementById('clear-grocery-btn').addEventListener('click', ()=>{
-  showConfirm('Clear this month\'s checked-off boxes and remove all extra items you\'ve added across every category? This cannot be undone.', ()=>{
+  showConfirm('Clear this month\'s checked-off boxes and remove this month\'s extra items across every category? This cannot be undone.', ()=>{
     const y = DATA.groceryViewYear, m = DATA.groceryViewMonth;
-    const monthKey = y+'-'+pad(m+1)+'|';
+    const bareMonthKey = y+'-'+pad(m+1);
+    const monthKeyPrefix = bareMonthKey+'|';
     Object.keys(DATA.groceryCompletion).forEach(key=>{
-      if(key.startsWith(monthKey)) delete DATA.groceryCompletion[key];
+      if(key.startsWith(monthKeyPrefix)) delete DATA.groceryCompletion[key];
     });
     Object.keys(DATA.groceryHaveAtHome).forEach(key=>{
-      if(key.startsWith(monthKey)) delete DATA.groceryHaveAtHome[key];
+      if(key.startsWith(monthKeyPrefix)) delete DATA.groceryHaveAtHome[key];
     });
-    DATA.groceryExtras = {};
+    // Only remove extras that belong to THIS month (plus any older, never-tagged extras,
+    // which have always behaved as showing on every month) — extras added for a different
+    // month should be left alone.
+    Object.keys(DATA.groceryExtras).forEach(cat=>{
+      DATA.groceryExtras[cat] = (DATA.groceryExtras[cat]||[]).filter(ex => ex.addedMonth && ex.addedMonth !== bareMonthKey);
+    });
     saveData();
     renderGroceryList();
-    showToast('Grocery list cleared.');
+    showToast('This month\'s grocery list cleared.');
   });
 });
 
