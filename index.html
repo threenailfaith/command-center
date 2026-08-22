@@ -707,7 +707,7 @@
           <button id="grocery-next">›</button>
         </div>
         <div style="display:flex;gap:8px;">
-          <button class="btn danger" id="clear-grocery-btn">Clear Page</button>
+          <button class="btn danger" id="clear-grocery-btn">Clear Checked Items</button>
           <button class="btn secondary" id="print-grocery-btn">Print Grocery List</button>
         </div>
       </div>
@@ -906,6 +906,7 @@ const DEFAULT_DATA = {
   groceryExtras: {}, // category -> [{id, name, qty, addedMonth:'YYYY-MM'}] (older entries may lack addedMonth; those show/clear on every month, same as before this field existed)
   groceryCompletion: {}, // key: 'year-month|category|itemname|unit' -> true (checked off while actually shopping)
   groceryHaveAtHome: {}, // same key -> true (checked ahead of time: already have this at home, separate from shopping progress)
+  groceryDismissed: {}, // same key -> true (bought and removed from view entirely by "Clear Bought Items", vs. just unchecked)
   groceryOverrides: {}, // same key -> manually adjusted quantity number
   masterIngredients: {}, // category -> [{id, name}]
   stockItems: [], // [{id, name, category}]
@@ -3060,7 +3061,10 @@ function renderGroceryList(){
   }
 
   container.innerHTML = sortedCats.map(cat=>{
-    const items = Object.values(categoryMap[cat]||{}).sort((a,b)=>a.name.localeCompare(b.name));
+    const items = Object.values(categoryMap[cat]||{}).filter(it=>{
+      const key = monthKey+'|'+cat+'|'+it.name.trim().toLowerCase()+'|'+(it.unit||'');
+      return !DATA.groceryDismissed[key];
+    }).sort((a,b)=>a.name.localeCompare(b.name));
     // Only show extras that belong to THIS month (or older, never-tagged extras from before
     // months were tracked) — otherwise an item added while shopping in August would keep
     // showing up on every future month's list too.
@@ -3189,25 +3193,56 @@ document.getElementById('print-grocery-btn').addEventListener('click', ()=>{
   window.print();
 });
 document.getElementById('clear-grocery-btn').addEventListener('click', ()=>{
-  showConfirm('Clear this month\'s checked-off boxes and remove this month\'s extra items across every category? This cannot be undone.', ()=>{
+  showConfirm('Remove every item you\'ve checked off — either "bought" or "have at home" — from this month\'s list? Anything left unchecked will stay so you can see what\'s still needed.', ()=>{
     const y = DATA.groceryViewYear, m = DATA.groceryViewMonth;
     const bareMonthKey = y+'-'+pad(m+1);
     const monthKeyPrefix = bareMonthKey+'|';
+
+    // Regular (meal-plan-computed) items: there's no "row" in storage to delete, since these
+    // are recalculated fresh from the meal plan every time the page renders. So instead of
+    // deleting anything, mark the checked-off ones as dismissed — the render filter above then
+    // skips them entirely, which is what makes the line disappear rather than just unchecking.
+    // Either checkbox counts — bought while shopping, or already had it at home.
+    const keysToDismiss = new Set();
     Object.keys(DATA.groceryCompletion).forEach(key=>{
-      if(key.startsWith(monthKeyPrefix)) delete DATA.groceryCompletion[key];
+      if(key.startsWith(monthKeyPrefix) && DATA.groceryCompletion[key]) keysToDismiss.add(key);
     });
     Object.keys(DATA.groceryHaveAtHome).forEach(key=>{
-      if(key.startsWith(monthKeyPrefix)) delete DATA.groceryHaveAtHome[key];
+      if(key.startsWith(monthKeyPrefix) && DATA.groceryHaveAtHome[key]) keysToDismiss.add(key);
     });
-    // Only remove extras that belong to THIS month (plus any older, never-tagged extras,
-    // which have always behaved as showing on every month) — extras added for a different
-    // month should be left alone.
+    keysToDismiss.forEach(key=>{ DATA.groceryDismissed[key] = true; });
+
+    // Extra / Stock Check items: these genuinely exist as rows in DATA, so a checked-off one
+    // (either box) gets deleted outright. Anything left unchecked is left completely alone.
     Object.keys(DATA.groceryExtras).forEach(cat=>{
-      DATA.groceryExtras[cat] = (DATA.groceryExtras[cat]||[]).filter(ex => ex.addedMonth && ex.addedMonth !== bareMonthKey);
+      DATA.groceryExtras[cat] = (DATA.groceryExtras[cat]||[]).filter(ex=>{
+        const belongsToThisMonth = !ex.addedMonth || ex.addedMonth===bareMonthKey;
+        if(!belongsToThisMonth) return true; // a different month's item, not part of this clear
+        const key = bareMonthKey+'|'+cat+'|extra:'+ex.id;
+        if(DATA.groceryCompletion[key] || DATA.groceryHaveAtHome[key]){
+          delete DATA.groceryCompletion[key];
+          delete DATA.groceryHaveAtHome[key];
+          return false; // checked off one way or the other — remove the line
+        }
+        return true; // not checked off yet — keep it visible
+      });
     });
+
+    // Tidy up leftover completion/have-at-home/override state for now-dismissed regular items
+    // so it doesn't linger in storage forever.
+    Object.keys(DATA.groceryCompletion).forEach(key=>{
+      if(DATA.groceryDismissed[key]) delete DATA.groceryCompletion[key];
+    });
+    Object.keys(DATA.groceryHaveAtHome).forEach(key=>{
+      if(DATA.groceryDismissed[key]) delete DATA.groceryHaveAtHome[key];
+    });
+    Object.keys(DATA.groceryOverrides).forEach(key=>{
+      if(DATA.groceryDismissed[key]) delete DATA.groceryOverrides[key];
+    });
+
     saveData();
     renderGroceryList();
-    showToast('This month\'s grocery list cleared.');
+    showToast('Checked-off items cleared from this month\'s list.');
   });
 });
 
