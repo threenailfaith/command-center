@@ -458,6 +458,7 @@
     <div class="nav-item" data-page="checklist">Content Checklist</div>
     <div class="nav-item" data-page="scriptureplans">Scripture Plans</div>
     <div class="nav-item" data-page="notes">General Notes</div>
+    <div class="nav-item" data-page="links">Links</div>
     <div class="nav-foot">
       <div id="sync-status">Everything here saves automatically to this browser.</div>
       <div class="backup-buttons">
@@ -843,6 +844,19 @@
       </table>
     </div>
 
+    <div class="page" id="page-links">
+      <div class="page-head">
+        <h1>Links</h1>
+      </div>
+      <div class="sheet-toolbar">
+        <button class="btn" id="add-link-row">+ Add Link</button>
+      </div>
+      <table class="sheet" id="links-table">
+        <thead><tr><th style="width:34px;"></th><th>Name</th><th>Web Address</th><th class="del-cell"></th></tr></thead>
+        <tbody id="links-tbody"></tbody>
+      </table>
+    </div>
+
   </div>
 </div>
 
@@ -878,6 +892,12 @@ function toISO(d){ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getD
 function fromISO(s){ const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); }
 function dayName(idx){ return ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][idx]; }
 function monthName(idx){ return ['January','February','March','April','May','June','July','August','September','October','November','December'][idx]; }
+function normalizeUrl(u){
+  const trimmed = (u||'').trim();
+  if(trimmed==='') return trimmed;
+  if(/^https?:\/\//i.test(trimmed)) return trimmed;
+  return 'https://'+trimmed;
+}
 
 const DEFAULT_DATA = {
   selectedDate: toISO(new Date()),
@@ -889,7 +909,9 @@ const DEFAULT_DATA = {
   events: [],
   holidaysSeeded: false,
   todoDump: { this: [], next: [], devotionals: [] },
-  dailyRecurring: [], // {id, day(0-6), section, task}
+  dailyRecurring: [], // {id, day(0-6), section, task, link} - link is an optional URL; when set, tapping
+                       // the task text on the Dashboard opens it in a new tab instead of just toggling done
+  speakLifeTasksSeeded: false, // one-time seed flag for the "Speak Life over businesses" SSBB task, Mon-Sat
   dailyCompletion: {}, // key: date|taskId -> true
   monthlyCompletion: {}, // key: date|taskId (or year-month|taskId for range rules) -> true
   adhocDaily: {}, // 'YYYY-MM-DD': [{id, text, done, section}]
@@ -918,6 +940,7 @@ const DEFAULT_DATA = {
   groceryViewMonth: new Date().getMonth(),
   notesCols: ['Category','Note','Status'],
   notesRows: [],
+  linksList: [], // [{id, name, url}] - rearrangeable list of links, opens in a new tab on click
   contentChecklist: {
     oneTime: [
       {id:'ot1', label:'Mid year planner', checked:false},
@@ -1052,6 +1075,7 @@ migrateTodoDump();
 migrateIngredientsAndMasterList();
 seedHolidaysIfNeeded();
 seedStockItemsIfNeeded();
+seedSpeakLifeTasksIfNeeded();
 
 // Always open on today's date, not whatever date was last selected in a previous session
 (function resetToToday(){
@@ -1175,7 +1199,7 @@ function startCloudSync(uid){
       applyingRemoteUpdate = true;
       DATA = Object.assign(JSON.parse(JSON.stringify(DEFAULT_DATA)), remote);
       migrateFavMeals(); migrateMealsToArrays(); migrateAdhocDaily(); migrateTodoDump(); migrateIngredientsAndMasterList();
-      seedHolidaysIfNeeded(); seedStockItemsIfNeeded();
+      seedHolidaysIfNeeded(); seedStockItemsIfNeeded(); seedSpeakLifeTasksIfNeeded();
       if(isFirst) applyResetToToday();
       localStorage.setItem(STORE_KEY, JSON.stringify(DATA));
       renderActivePage();
@@ -1227,7 +1251,7 @@ function startCloudSync(uid){
         const remote = JSON.parse(snap.data().data);
         DATA = Object.assign(JSON.parse(JSON.stringify(DEFAULT_DATA)), remote);
         migrateFavMeals(); migrateMealsToArrays(); migrateAdhocDaily(); migrateTodoDump(); migrateIngredientsAndMasterList();
-        seedHolidaysIfNeeded(); seedStockItemsIfNeeded();
+        seedHolidaysIfNeeded(); seedStockItemsIfNeeded(); seedSpeakLifeTasksIfNeeded();
       }catch(e){ console.error('Could not parse cloud data', e); }
     } else {
       // first time this account has synced: push whatever is already on this device up
@@ -1410,6 +1434,7 @@ function renderActivePage(){
   if(page==='notes') renderNotes();
   if(page==='events') renderEventsTable();
   if(page==='todo') renderTodoDump();
+  if(page==='links') renderLinksPage();
 }
 
 document.querySelectorAll('.nav-item').forEach(item=>{
@@ -1429,6 +1454,7 @@ document.querySelectorAll('.nav-item').forEach(item=>{
     if(item.dataset.page==='notes') renderNotes();
     if(item.dataset.page==='events') renderEventsTable();
     if(item.dataset.page==='todo') renderTodoDump();
+    if(item.dataset.page==='links') renderLinksPage();
   });
 });
 
@@ -1637,6 +1663,17 @@ function seedStockItemsIfNeeded(){
   ];
   DATA.stockItems = items.map(([name,category])=>({id:uid(), name, category}));
   DATA.stockItemsSeeded = true;
+  saveData();
+}
+
+function seedSpeakLifeTasksIfNeeded(){
+  if(DATA.speakLifeTasksSeeded) return;
+  // Monday(1) through Saturday(6) — each day gets its own separate record so the link
+  // (added afterward on the Daily Tasks Setup page) can be set independently per day.
+  for(let d=1; d<=6; d++){
+    DATA.dailyRecurring.push({id:uid(), day:d, section:'SSBB', task:'Speak Life over businesses', link:''});
+  }
+  DATA.speakLifeTasksSeeded = true;
   saveData();
 }
 
@@ -2035,7 +2072,7 @@ function renderDailySetup(){
     wrap.style.marginBottom = '16px';
     wrap.innerHTML = `
       <h2>${dayName(d)} <span class="sub">${dayItems.length} task${dayItems.length!==1?'s':''}</span></h2>
-      <table class="sheet"><thead><tr><th style="width:34px;"></th><th style="width:120px;">Section</th><th>Task</th><th class="del-cell"></th></tr></thead>
+      <table class="sheet"><thead><tr><th style="width:34px;"></th><th style="width:120px;">Section</th><th>Task</th><th style="width:220px;">Link (optional)</th><th class="del-cell"></th></tr></thead>
       <tbody id="daily-tbody-${d}"></tbody></table>
       <div class="sheet-toolbar" style="margin-top:10px;margin-bottom:0;">
         <button class="btn small secondary" data-day="${d}">+ Add task for ${dayName(d)}</button>
@@ -2057,10 +2094,12 @@ function renderDailySetup(){
           </select>
         </td>
         <td><input type="text" placeholder="Task" value="${escapeAttr(t.task||'')}" data-field="task"></td>
+        <td><input type="url" placeholder="https://..." value="${escapeAttr(t.link||'')}" data-field="link"></td>
         <td class="del-cell"><button class="icon-btn">✕</button></td>
       `;
       tr.querySelector('[data-field=section]').addEventListener('change', e=>{ t.section=e.target.value; saveData(); renderDashDaily(); });
       tr.querySelector('[data-field=task]').addEventListener('input', e=>{ t.task=e.target.value; saveData(); renderDashDaily(); });
+      tr.querySelector('[data-field=link]').addEventListener('input', e=>{ t.link=e.target.value; saveData(); renderDashDaily(); });
       tr.querySelector('.icon-btn').addEventListener('click', ()=>{
         DATA.dailyRecurring = DATA.dailyRecurring.filter(x=>x.id!==t.id);
         saveData(); renderDailySetup(); renderDashDaily();
@@ -2083,7 +2122,7 @@ function renderDailySetup(){
       });
     }
     wrap.querySelector('[data-day]').addEventListener('click', ()=>{
-      DATA.dailyRecurring.push({id:uid(), day:d, section:'Home', task:''});
+      DATA.dailyRecurring.push({id:uid(), day:d, section:'Home', task:'', link:''});
       saveData(); renderDailySetup();
     });
   }
@@ -2117,7 +2156,11 @@ function renderDashDaily(){
         const key = DATA.selectedDate+'|'+t.id;
         const done = !!DATA.dailyCompletion[key];
         const badge = t.section==='SSBB_TNF' ? ' <span class="tag tag-SSBB_TNF" style="margin-left:4px;">SSBB &amp; TNF</span>' : '';
-        return `<div class="dt-item ${done?'done':''}" data-key="${key}"><input type="checkbox" ${done?'checked':''}><span>${escapeHTML(t.task)}${badge}</span></div>`;
+        const hasLink = t.link && t.link.trim()!=='';
+        const taskLabel = hasLink
+          ? `<span class="dt-task-link" title="Tap to open link" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted;">${escapeHTML(t.task)}</span>`
+          : `<span>${escapeHTML(t.task)}</span>`;
+        return `<div class="dt-item ${done?'done':''}" data-key="${key}" data-task-id="${t.id}"><input type="checkbox" ${done?'checked':''}>${taskLabel}${badge}</div>`;
       }).join('');
       html += adhocItems.map(item=>{
         const badge = item.section==='SSBB_TNF' ? ' <span class="tag tag-SSBB_TNF" style="margin-left:4px;">SSBB &amp; TNF</span>' : '';
@@ -2131,6 +2174,15 @@ function renderDashDaily(){
         const key = cb.closest('.dt-item').dataset.key;
         if(cb.checked) DATA.dailyCompletion[key] = true; else delete DATA.dailyCompletion[key];
         saveData(); renderDashDaily();
+      });
+    });
+    el.querySelectorAll('.dt-item[data-key] .dt-task-link').forEach(span=>{
+      span.addEventListener('click', ()=>{
+        const taskId = span.closest('.dt-item').dataset.taskId;
+        const t = DATA.dailyRecurring.find(x=>x.id===taskId);
+        if(t && t.link && t.link.trim()!==''){
+          window.open(normalizeUrl(t.link.trim()), '_blank');
+        }
       });
     });
     el.querySelectorAll('.dt-item[data-adhoc-id]').forEach(row=>{
@@ -3285,6 +3337,59 @@ document.getElementById('add-note-col').addEventListener('click', ()=>{
   DATA.notesCols.push('New Column');
   DATA.notesRows.forEach(r=>r.cells.push(''));
   saveData(); renderNotes();
+});
+
+/* =========================================================
+   LINKS
+   ========================================================= */
+function renderLinksPage(){
+  const tbody = document.getElementById('links-tbody');
+  tbody.innerHTML = '';
+  DATA.linksList.forEach(link=>{
+    const tr = document.createElement('tr');
+    tr.dataset.id = link.id;
+    tr.innerHTML = `
+      <td class="drag-handle" title="Drag to reorder">⠿</td>
+      <td><input type="text" placeholder="Name" value="${escapeAttr(link.name||'')}" data-field="name"></td>
+      <td>
+        <span class="links-url-open" title="Open in a new tab" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted;color:var(--navy);font-size:13px;padding-right:8px;white-space:nowrap;">${link.url && link.url.trim()!=='' ? '↗' : ''}</span>
+        <input type="url" placeholder="https://..." value="${escapeAttr(link.url||'')}" data-field="url" style="width:calc(100% - 26px);display:inline-block;">
+      </td>
+      <td class="del-cell"><button class="icon-btn">✕</button></td>
+    `;
+    tr.querySelector('[data-field=name]').addEventListener('input', e=>{ link.name=e.target.value; saveData(); });
+    tr.querySelector('[data-field=url]').addEventListener('input', e=>{
+      link.url = e.target.value;
+      saveData();
+      const openSpan = tr.querySelector('.links-url-open');
+      openSpan.textContent = link.url && link.url.trim()!=='' ? '↗' : '';
+    });
+    tr.querySelector('.links-url-open').addEventListener('click', ()=>{
+      if(link.url && link.url.trim()!=='') window.open(normalizeUrl(link.url.trim()), '_blank');
+    });
+    tr.querySelector('.icon-btn').addEventListener('click', ()=>{
+      DATA.linksList = DATA.linksList.filter(x=>x.id!==link.id);
+      saveData(); renderLinksPage();
+    });
+    tbody.appendChild(tr);
+  });
+  if(typeof Sortable !== 'undefined'){
+    new Sortable(tbody, {
+      handle: '.drag-handle',
+      animation: 150,
+      forceFallback: true,
+      fallbackTolerance: 3,
+      onEnd: function(){
+        const newOrder = [...tbody.children].map(tr=>tr.dataset.id);
+        DATA.linksList = newOrder.map(id => DATA.linksList.find(l=>l.id===id));
+        saveData();
+      }
+    });
+  }
+}
+document.getElementById('add-link-row').addEventListener('click', ()=>{
+  DATA.linksList.push({id:uid(), name:'', url:''});
+  saveData(); renderLinksPage();
 });
 
 /* =========================================================
