@@ -321,6 +321,10 @@
   .ing-master-add input{flex:1;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12.5px;}
 
   #stock-list-container{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-top:16px;}
+  #freezer-list-container{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-top:16px;}
+  .freezer-qty-input{width:52px;flex-shrink:0;font-weight:700;color:var(--navy);font-size:12.5px;border:1px solid var(--border);border-radius:6px;padding:3px 4px;text-align:center;}
+  .freezer-qty-input:focus{outline:none;border-color:var(--navy);background:var(--lavender);}
+  .grocery-freezer-badge{font-size:11.5px;font-weight:700;color:var(--navy);background:var(--lavender);border:1px solid var(--lavender-mid);border-radius:6px;padding:2px 6px;white-space:nowrap;flex-shrink:0;}
   .stock-cat{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px;}
   .stock-cat h3{margin:0 0 10px 0;font-size:13.5px;text-transform:uppercase;letter-spacing:0.5px;color:var(--purple);font-family:'DM Sans',sans-serif;font-weight:700;}
   .stock-row{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;color:var(--navy);}
@@ -376,7 +380,7 @@
   .grocery-item{display:flex;align-items:center;gap:7px;font-size:13.5px;padding:4px 0;color:var(--navy);border-bottom:1px solid var(--border);}
   .grocery-item input[type=checkbox]{width:15px;height:15px;accent-color:var(--navy);cursor:pointer;flex-shrink:0;}
   .grocery-item-name{flex:1;}
-  .grocery-item.done .grocery-item-name{text-decoration:line-through;color:var(--slate-light);}
+  .grocery-item.done .grocery-item-name{text-decoration:line-through;color:#1a1a1a;}
   .grocery-item.have .grocery-item-name{text-decoration:line-through;color:#1a1a1a;}
   .grocery-item:last-child{border-bottom:none;}
   .grocery-count{font-weight:700;color:var(--purple);font-size:12px;flex-shrink:0;}
@@ -405,6 +409,7 @@
     #grocery-list-container{grid-template-columns:1fr;}
     #master-ingredients-container{grid-template-columns:1fr;}
     #stock-list-container{grid-template-columns:1fr;}
+    #freezer-list-container{grid-template-columns:1fr;}
     .dash-grid{grid-template-columns:1fr;}
     .daily-tasks-grid{grid-template-columns:1fr;}
     .two-col{grid-template-columns:1fr;}
@@ -455,6 +460,7 @@
     <div class="nav-item" data-page="grocery">Grocery List</div>
     <div class="nav-item" data-page="ingredients">Master Ingredients</div>
     <div class="nav-item" data-page="stock">Stock Check</div>
+    <div class="nav-item" data-page="freezer">Freezer Stock</div>
     <div class="nav-item" data-page="checklist">Content Checklist</div>
     <div class="nav-item" data-page="scriptureplans">Scripture Plans</div>
     <div class="nav-item" data-page="notes">General Notes</div>
@@ -743,6 +749,21 @@
       </div>
     </div>
 
+    <div class="page" id="page-freezer">
+      <div class="page-head">
+        <h1>Freezer Stock</h1>
+      </div>
+      <div id="freezer-list-container"></div>
+
+      <div class="section-divider"><span>Add an Item</span><div class="line"></div></div>
+      <div class="sheet-toolbar">
+        <select id="freezer-add-select" style="flex:1;max-width:320px;border:1px solid var(--border);border-radius:8px;padding:9px 10px;font-size:13.5px;background:#fff;">
+          <option value="">Choose ingredient...</option>
+        </select>
+        <button class="btn" id="freezer-add-btn">+ Add Item</button>
+      </div>
+    </div>
+
     <!-- ================= CONTENT CHECKLIST ================= -->
     <div class="page" id="page-checklist">
       <div class="page-head">
@@ -934,6 +955,7 @@ const DEFAULT_DATA = {
   stockItems: [], // [{id, name, category}]
   stockItemsSeeded: false,
   stockInStock: {}, // key: 'year-month|itemId' -> true, resets feel each month
+  freezerStock: [], // [{id, name, category, qty}] - inventory of what's currently in the freezer
   stockViewYear: new Date().getFullYear(),
   stockViewMonth: new Date().getMonth(),
   groceryViewYear: new Date().getFullYear(),
@@ -1429,6 +1451,7 @@ function renderActivePage(){
   if(page==='grocery') renderGroceryList();
   if(page==='ingredients') renderMasterIngredients();
   if(page==='stock') renderStockList();
+  if(page==='freezer') renderFreezerStock();
   if(page==='checklist') renderChecklist();
   if(page==='scriptureplans') renderScripturePlans();
   if(page==='notes') renderNotes();
@@ -1449,6 +1472,7 @@ document.querySelectorAll('.nav-item').forEach(item=>{
     if(item.dataset.page==='grocery') renderGroceryList();
     if(item.dataset.page==='ingredients') renderMasterIngredients();
     if(item.dataset.page==='stock') renderStockList();
+    if(item.dataset.page==='freezer') renderFreezerStock();
     if(item.dataset.page==='checklist') renderChecklist();
     if(item.dataset.page==='scriptureplans') renderScripturePlans();
     if(item.dataset.page==='notes') renderNotes();
@@ -3039,6 +3063,78 @@ document.getElementById('stock-new-name').addEventListener('keydown', e=>{
   if(e.key==='Enter') document.getElementById('stock-add-btn').click();
 });
 
+/* =========================================================
+   FREEZER STOCK
+   ========================================================= */
+function renderFreezerStock(){
+  const container = document.getElementById('freezer-list-container');
+  const sortedCats = [...GROCERY_CATEGORIES].sort();
+
+  if(DATA.freezerStock.length===0){
+    container.innerHTML = '<div class="empty-slot">Nothing added yet, pick an item below to start your freezer inventory.</div>';
+  } else {
+    container.innerHTML = sortedCats.map(cat=>{
+      const items = DATA.freezerStock.filter(it=>it.category===cat).sort((a,b)=>a.name.localeCompare(b.name));
+      if(items.length===0) return '';
+      return `
+        <div class="stock-cat" data-cat="${escapeAttr(cat)}">
+          <h3>${cat}</h3>
+          ${items.map(it=>`<div class="stock-row" data-id="${it.id}">
+            <span class="stock-row-name">${escapeHTML(it.name)}</span>
+            <input type="number" min="0" step="1" class="freezer-qty-input" value="${it.qty||0}" title="How many you have in the freezer">
+            <button class="stock-row-del" title="Remove from list">✕</button>
+          </div>`).join('')}
+        </div>`;
+    }).join('');
+  }
+
+  container.querySelectorAll('.stock-row').forEach(row=>{
+    const id = row.dataset.id;
+    const item = DATA.freezerStock.find(x=>x.id===id);
+    if(!item) return;
+    row.querySelector('.freezer-qty-input').addEventListener('input', e=>{
+      const n = Number(e.target.value);
+      item.qty = isNaN(n) ? 0 : n;
+      saveData();
+      renderGroceryList();
+    });
+    row.querySelector('.stock-row-del').addEventListener('click', ()=>{
+      DATA.freezerStock = DATA.freezerStock.filter(x=>x.id!==id);
+      saveData();
+      renderFreezerStock();
+      renderGroceryList();
+    });
+  });
+
+  const addSelect = document.getElementById('freezer-add-select');
+  addSelect.innerHTML = '<option value="">Choose ingredient...</option>' + sortedCats.map(c=>{
+    const master = (DATA.masterIngredients[c]||[]).slice().sort((a,b)=>a.name.localeCompare(b.name));
+    if(master.length===0) return '';
+    return `<optgroup label="${escapeAttr(c)}">${master.map(m=>`<option value="${escapeAttr(m.name)}" data-cat="${escapeAttr(c)}">${escapeHTML(m.name)}</option>`).join('')}</optgroup>`;
+  }).join('');
+}
+document.getElementById('freezer-add-btn').addEventListener('click', ()=>{
+  const select = document.getElementById('freezer-add-select');
+  const name = select.value;
+  if(!name) return;
+  const opt = select.selectedOptions[0];
+  const category = opt.dataset.cat;
+  const already = DATA.freezerStock.some(x=>x.category===category && x.name.trim().toLowerCase()===name.trim().toLowerCase());
+  if(already){
+    showToast('"'+name+'" is already on your Freezer Stock list.');
+    return;
+  }
+  DATA.freezerStock.push({id:uid(), name, category, qty:0});
+  select.value = '';
+  saveData();
+  renderFreezerStock();
+});
+
+function getFreezerQty(category, name){
+  const entry = DATA.freezerStock.find(x=>x.category===category && x.name.trim().toLowerCase()===name.trim().toLowerCase());
+  return entry ? entry.qty : null;
+}
+
 
 function getGroceryListForMonth(year, month){
   const nameCounts = {};
@@ -3112,6 +3208,14 @@ function renderGroceryList(){
     return '';
   }
 
+  const FREEZER_INDICATOR_CATS = ['Meats','Breads','Frozen'];
+  function freezerBadge(cat, name){
+    if(!FREEZER_INDICATOR_CATS.includes(cat)) return '';
+    const qty = getFreezerQty(cat, name);
+    if(qty===null) return ''; // no matching entry on the Freezer Stock page, so nothing to show
+    return `<span class="grocery-freezer-badge" title="You have this many in the freezer">\u2744 ${qty}</span>`;
+  }
+
   container.innerHTML = sortedCats.map(cat=>{
     const items = Object.values(categoryMap[cat]||{}).filter(it=>{
       const key = monthKey+'|'+cat+'|'+it.name.trim().toLowerCase()+'|'+(it.unit||'');
@@ -3140,6 +3244,7 @@ function renderGroceryList(){
               ${suffix ? '<span class="grocery-unit-suffix">'+escapeHTML(suffix)+'</span>' : ''}
               <span class="grocery-item-name">${escapeHTML(it.name)}</span>
               ${hasOverride ? '<button class="icon-btn small-x grocery-reset-btn" title="Reset to calculated amount">\u21ba</button>' : ''}
+              ${freezerBadge(cat, it.name)}
               <input type="checkbox" class="grocery-have-checkbox" ${have?'checked':''} title="Already have this at home">
             </div>`;
           }).join('')}
@@ -3151,6 +3256,7 @@ function renderGroceryList(){
               <input type="checkbox" class="grocery-check" ${done?'checked':''} title="Check off while shopping">
               <input type="text" class="grocery-extra-qty-input" placeholder="Qty" value="${escapeAttr(ex.qty||'')}">
               <span class="grocery-item-name">${escapeHTML(ex.name)}</span>
+              ${freezerBadge(cat, ex.name)}
               <input type="checkbox" class="grocery-have-checkbox" ${have?'checked':''} title="Already have this at home">
               <button class="icon-btn small-x grocery-extra-del">✕</button>
             </div>`;
