@@ -753,6 +753,9 @@
       <div class="page-head">
         <h1>Freezer Stock</h1>
       </div>
+      <div class="sheet-toolbar" style="margin-bottom:16px;">
+        <button class="btn danger" id="clear-freezer-btn">Reset All to 0</button>
+      </div>
       <div id="freezer-list-container"></div>
 
       <div class="section-divider"><span>Add an Item</span><div class="line"></div></div>
@@ -3128,6 +3131,15 @@ document.getElementById('freezer-add-btn').addEventListener('click', ()=>{
   select.value = '';
   saveData();
   renderFreezerStock();
+});
+document.getElementById('clear-freezer-btn').addEventListener('click', ()=>{
+  showConfirm('Reset every item on your Freezer Stock list back to 0? This only resets the counts, it won\'t remove any items from the list.', ()=>{
+    DATA.freezerStock.forEach(item=>{ item.qty = 0; });
+    saveData();
+    renderFreezerStock();
+    renderGroceryList();
+    showToast('Freezer Stock counts reset to 0.');
+  });
 });
 
 function getFreezerQty(category, name){
