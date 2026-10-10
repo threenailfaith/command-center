@@ -96,6 +96,14 @@
 
   /* Scripture card */
   .scripture-card{background:var(--navy);color:#fff;border:none;}
+  .goal-verse-card{margin-bottom:6px;}
+  .goal-row{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:8px 12px;margin-bottom:8px;}
+  .goal-row .goal-text{flex:1;min-width:0;border:none;background:transparent;font-size:14px;color:var(--navy);padding:4px 2px;font-family:inherit;}
+  .goal-row .goal-text:focus{outline:none;background:var(--lavender);border-radius:6px;}
+  .goal-row .goal-check{width:17px;height:17px;accent-color:var(--navy);cursor:pointer;flex-shrink:0;}
+  .goal-row .goal-date{flex-shrink:0;border:1px solid var(--border);border-radius:6px;padding:4px 6px;font-size:12.5px;color:var(--slate);background:#fff;font-family:inherit;}
+  .goal-row.achieved .goal-text{text-decoration:line-through;color:var(--slate);}
+  @media (max-width:600px){ .goal-row{flex-wrap:wrap;} .goal-row .goal-text{flex-basis:100%;} }
   .scripture-card h2{color:rgba(255,255,255,0.75);}
   .scripture-verse-input{font-family:'Lora',serif;font-style:italic;font-size:17px;line-height:1.5;margin:6px 0 6px 0;width:100%;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.18);border-radius:8px;padding:8px 10px;color:#fff;resize:vertical;font-weight:400;}
   .scripture-verse-input::placeholder{color:rgba(255,255,255,0.4);font-style:italic;}
@@ -452,6 +460,7 @@
   <div class="nav">
     <div class="nav-brand">Command Center<span>Daily Overview</span></div>
     <div class="nav-item active" data-page="dashboard">Dashboard</div>
+    <div class="nav-item" data-page="goals">Goal</div>
     <div class="nav-item" data-page="events">Upcoming Events</div>
     <div class="nav-item" data-page="todo">To-Do Dump</div>
     <div class="nav-item" data-page="daily">Daily Tasks Setup</div>
@@ -594,6 +603,25 @@
     </div>
 
     <!-- ================= EVENTS DUMP ================= -->
+    <div class="page" id="page-goals">
+      <div class="page-head">
+        <h1>Goal</h1>
+      </div>
+      <div class="card scripture-card goal-verse-card">
+        <h2>Matthew 7:7-8</h2>
+        <textarea class="scripture-verse-input" id="goal-verse-input" rows="4" aria-label="Matthew 7:7-8"></textarea>
+      </div>
+
+      <div class="section-divider"><span>My Goals</span><div class="line"></div></div>
+      <div id="goals-active-list"></div>
+      <div class="sheet-toolbar" style="margin-top:10px;">
+        <button class="btn" id="add-goal-btn">+ Add Goal</button>
+      </div>
+
+      <div class="section-divider"><span>Goals Achieved</span><div class="line"></div></div>
+      <div id="goals-achieved-list"></div>
+    </div>
+
     <div class="page" id="page-events">
       <div class="page-head">
         <h1>Upcoming Events Dump</h1>
@@ -965,6 +993,8 @@ const DEFAULT_DATA = {
   groceryViewMonth: new Date().getMonth(),
   notesCols: ['Category','Note','Status'],
   notesRows: [],
+  goalsList: [], // [{id, text, date:'YYYY-MM-DD', done:bool}] - done goals show in the "Goals Achieved" section
+  goalVerse: 'Ask, and it shall be given you; seek, and ye shall find; knock, and it shall be opened unto you: For every one that asketh receiveth; and he that seeketh findeth; and to him that knocketh it shall be opened.', // KJV (public domain); editable on the Goal page
   linksList: [], // [{id, name, url}] - rearrangeable list of links, opens in a new tab on click
   contentChecklist: {
     oneTime: [
@@ -1461,6 +1491,7 @@ function renderActivePage(){
   if(page==='events') renderEventsTable();
   if(page==='todo') renderTodoDump();
   if(page==='links') renderLinksPage();
+  if(page==='goals') renderGoalsPage();
 }
 
 document.querySelectorAll('.nav-item').forEach(item=>{
@@ -1482,6 +1513,7 @@ document.querySelectorAll('.nav-item').forEach(item=>{
     if(item.dataset.page==='events') renderEventsTable();
     if(item.dataset.page==='todo') renderTodoDump();
     if(item.dataset.page==='links') renderLinksPage();
+    if(item.dataset.page==='goals') renderGoalsPage();
   });
 });
 
@@ -3455,6 +3487,55 @@ document.getElementById('add-note-col').addEventListener('click', ()=>{
   DATA.notesCols.push('New Column');
   DATA.notesRows.forEach(r=>r.cells.push(''));
   saveData(); renderNotes();
+});
+
+/* =========================================================
+   GOALS
+   ========================================================= */
+function goalRowHTML(g, achieved){
+  return `<div class="goal-row ${achieved?'achieved':''}" data-id="${g.id}">
+    <input type="text" class="goal-text" placeholder="Type a goal..." value="${escapeAttr(g.text||'')}">
+    <input type="checkbox" class="goal-check" ${g.done?'checked':''} title="${achieved?'Move back to My Goals':'Mark as achieved'}">
+    <input type="date" class="goal-date" value="${escapeAttr(g.date||'')}" title="Date">
+    <button class="icon-btn goal-del" title="Remove">\u2715</button>
+  </div>`;
+}
+function renderGoalsPage(){
+  const verseEl = document.getElementById('goal-verse-input');
+  if(document.activeElement !== verseEl) verseEl.value = DATA.goalVerse || '';
+
+  const active = DATA.goalsList.filter(g=>!g.done);
+  const achieved = DATA.goalsList.filter(g=>g.done);
+  document.getElementById('goals-active-list').innerHTML = active.length
+    ? active.map(g=>goalRowHTML(g,false)).join('')
+    : '<div class="empty-slot">No goals yet, tap + Add Goal to start one.</div>';
+  document.getElementById('goals-achieved-list').innerHTML = achieved.length
+    ? achieved.map(g=>goalRowHTML(g,true)).join('')
+    : '<div class="empty-slot">Goals you check off will move here.</div>';
+
+  document.querySelectorAll('#page-goals .goal-row').forEach(row=>{
+    const goal = DATA.goalsList.find(x=>x.id===row.dataset.id);
+    if(!goal) return;
+    // Typing and picking a date save without re-rendering, so the box never loses focus mid-edit.
+    row.querySelector('.goal-text').addEventListener('input', e=>{ goal.text = e.target.value; saveData(); });
+    row.querySelector('.goal-date').addEventListener('change', e=>{ goal.date = e.target.value; saveData(); });
+    // Checking (or unchecking) moves the whole line between the two sections.
+    row.querySelector('.goal-check').addEventListener('change', e=>{
+      goal.done = e.target.checked;
+      saveData(); renderGoalsPage();
+    });
+    row.querySelector('.goal-del').addEventListener('click', ()=>{
+      DATA.goalsList = DATA.goalsList.filter(x=>x.id!==goal.id);
+      saveData(); renderGoalsPage();
+    });
+  });
+}
+document.getElementById('goal-verse-input').addEventListener('input', e=>{ DATA.goalVerse = e.target.value; saveData(); });
+document.getElementById('add-goal-btn').addEventListener('click', ()=>{
+  DATA.goalsList.push({id:uid(), text:'', date:'', done:false});
+  saveData(); renderGoalsPage();
+  const boxes = document.querySelectorAll('#goals-active-list .goal-text');
+  if(boxes.length) boxes[boxes.length-1].focus();
 });
 
 /* =========================================================
