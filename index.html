@@ -2807,8 +2807,12 @@ function renderFavMeals(){
 
       li.querySelector('.fav-del').addEventListener('click', e=>{
         e.stopPropagation();
-        DATA.favMeals[g] = DATA.favMeals[g].filter(x=>x.id!==id);
-        saveData(); drawGroup(g);
+        // Extra confirmation so a mis-tap near the ingredient button can't delete a recipe by accident.
+        const name = item ? item.name : 'this recipe';
+        showConfirm('Delete "'+name+'" from your recipes? Its ingredient list will be deleted too. This cannot be undone.', ()=>{
+          DATA.favMeals[g] = DATA.favMeals[g].filter(x=>x.id!==id);
+          saveData(); drawGroup(g);
+        }, 'Delete Recipe');
       });
 
       const ingToggle = li.querySelector('.fav-ing-toggle');
@@ -3798,10 +3802,11 @@ document.getElementById('add-ssbb-grid-row').addEventListener('click', ()=>{
   DATA.contentChecklist.ssbbGrid.push({id:uid(), label:'', months:Array(13).fill(false)});
   saveData(); renderChecklist();
 });
-function showConfirm(message, onConfirm){
+function showConfirm(message, onConfirm, okLabel){
   const modal = document.getElementById('confirm-modal');
   document.getElementById('confirm-modal-text').textContent = message;
   const okBtn = document.getElementById('confirm-modal-ok');
+  okBtn.textContent = okLabel || 'Clear All'; // default keeps the existing pop-ups unchanged
   const cancelBtn = document.getElementById('confirm-modal-cancel');
   modal.classList.add('show');
   function cleanup(){
