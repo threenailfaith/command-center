@@ -1195,122 +1195,223 @@ function setSyncStatus(state, text){
   el.innerHTML = '<span class="sync-dot '+dotClass+'"></span>'+text;
 }
 
+/* ---- Merge engine: combines edits from two devices instead of letting one overwrite the other ----
+   base   = the last copy both this device and the cloud agreed on
+   local  = what this device has now
+   remote = what the cloud has now
+   Whatever changed on only one side is kept; if both changed the same single value, this device wins. */
+const VIEW_KEYS = ['selectedDate','calViewYear','calViewMonth','mealCalViewYear','mealCalViewMonth','stockViewYear','stockViewMonth','groceryViewYear','groceryViewMonth'];
+function jeq(a,b){ return JSON.stringify(a)===JSON.stringify(b); }
+function isPlainObj(v){ return v && typeof v==='object' && !Array.isArray(v); }
+function isIdArray(a){ return Array.isArray(a) && a.every(x=>x && typeof x==='object' && !Array.isArray(x) && x.id!==undefined && x.id!==null); }
+function mergeVal(base, local, remote){
+  if(jeq(local, remote)) return local;
+  if(jeq(local, base)) return remote;
+  if(jeq(remote, base)) return local;
+  if(isPlainObj(local) && isPlainObj(remote)){
+    const b = isPlainObj(base) ? base : {};
+    const out = {};
+    new Set([...Object.keys(local), ...Object.keys(remote)]).forEach(k=>{
+      const v = mergeVal(b[k], local[k], remote[k]);
+      if(v!==undefined) out[k]=v;
+    });
+    return out;
+  }
+  if(isIdArray(local) && isIdArray(remote) && (base===undefined || isIdArray(base))){
+    const b = base||[];
+    const bm = new Map(b.map(x=>[x.id,x])), lm = new Map(local.map(x=>[x.id,x])), rm = new Map(remote.map(x=>[x.id,x]));
+    const ids = [];
+    // order: if this device re-ordered existing rows, follow its order; otherwise follow the cloud's order
+    const reordered = !jeq(local.map(x=>x.id).filter(i=>bm.has(i)), b.map(x=>x.id).filter(i=>lm.has(i)));
+    const first = reordered ? local : remote, second = reordered ? remote : local;
+    [...first, ...second].forEach(x=>{ if(!ids.includes(x.id)) ids.push(x.id); });
+    const out = [];
+    ids.forEach(id=>{
+      const inB = bm.has(id), inL = lm.has(id), inR = rm.has(id);
+      if(inL && inR){ out.push(mergeVal(bm.get(id), lm.get(id), rm.get(id))); }
+      else if(inL){ if(!inB) out.push(lm.get(id)); else if(!jeq(lm.get(id), bm.get(id))) out.push(lm.get(id)); /* removed elsewhere but edited here: keep */ }
+      else if(inR){ if(!inB) out.push(rm.get(id)); else if(!jeq(rm.get(id), bm.get(id))) out.push(rm.get(id)); }
+    });
+    return out;
+  }
+  return local; // both changed the same single value: this device wins
+}
+function mergeData(base, local, remote){
+  const m = mergeVal(base||{}, local, remote);
+  VIEW_KEYS.forEach(k=>{ if(local[k]!==undefined) m[k]=local[k]; }); // which page/month you're looking at never travels between devices
+  return m;
+}
+// First run after this update (no shared baseline saved yet): keep everything from the cloud,
+// and only add things this device has that the cloud doesn't.
+function unionPreferRemote(local, remote){
+  if(isPlainObj(local) && isPlainObj(remote)){
+    const out = {};
+    new Set([...Object.keys(local), ...Object.keys(remote)]).forEach(k=>{
+      out[k] = remote[k]===undefined ? local[k] : (local[k]===undefined ? remote[k] : unionPreferRemote(local[k], remote[k]));
+    });
+    return out;
+  }
+  if(isIdArray(local) && isIdArray(remote)){
+    const rm = new Set(remote.map(x=>x.id));
+    return [...remote.map(r=>{ const l=local.find(x=>x.id===r.id); return l? unionPreferRemote(l,r): r; }), ...local.filter(x=>!rm.has(x.id))];
+  }
+  return remote;
+}
+
+const BASE_KEY = STORE_KEY + '_cloudbase';
+let baseJson = null;          // last copy this device and the cloud agreed on
+let saveInFlight = false, saveAgain = false, retryTimer = null, retryDelay = 4000;
+let renderDeferred = false;
+
+function loadBase(){ try{ return localStorage.getItem(BASE_KEY); }catch(e){ return null; } }
+function storeBase(j){ baseJson = j; try{ localStorage.setItem(BASE_KEY, j); }catch(e){} }
+
+function normalizeLoaded(obj){
+  DATA = Object.assign(JSON.parse(JSON.stringify(DEFAULT_DATA)), obj);
+  migrateFavMeals(); migrateMealsToArrays(); migrateAdhocDaily(); migrateTodoDump(); migrateIngredientsAndMasterList();
+  seedHolidaysIfNeeded(); seedStockItemsIfNeeded(); seedSpeakLifeTasksIfNeeded();
+}
+function isTypingInField(){
+  const a = document.activeElement;
+  if(!a || !a.closest || !a.closest('#main-app')) return false;
+  if(a.tagName==='TEXTAREA' || a.tagName==='SELECT') return true;
+  if(a.tagName==='INPUT'){ const t=(a.type||'text').toLowerCase(); return !['checkbox','radio','button','submit'].includes(t); }
+  return false;
+}
+
 function queueCloudSave(){
   if(!cloudSyncReady || !currentUID || applyingRemoteUpdate) return;
-  if(pendingRemoteData){
-    // She's editing something and a remote update was already held back once.
-    // That held-back snapshot is now stale relative to this fresh edit, drop it
-    // rather than risk applying it later and overwriting what she just typed.
-    // Her own edit (about to be saved below) will reconcile everything correctly.
-    pendingRemoteData = null;
-  }
   hasPendingLocalSave = true;
   setSyncStatus('syncing', 'Saving...');
   clearTimeout(cloudSaveTimer);
-  cloudSaveTimer = setTimeout(()=>{
-    const payload = JSON.stringify(DATA);
+  cloudSaveTimer = setTimeout(doCloudSave, 900);
+}
+
+// Save = read what's in the cloud right now, merge this device's edits into it, write it back (all in one step).
+function doCloudSave(){
+  if(!cloudSyncReady || !currentUID) return;
+  if(saveInFlight){ saveAgain = true; return; }
+  saveInFlight = true; saveAgain = false;
+  clearTimeout(retryTimer);
+  const sentLocal = JSON.parse(JSON.stringify(DATA));
+  const docRef = fbDb.collection('users').doc(currentUID);
+  let mergedObj = null, payload = null;
+  let tmo; const timeout = new Promise((_,rej)=>{ tmo=setTimeout(()=>rej(new Error('save timed out')), 20000); });
+  const work = fbDb.runTransaction(tx=> tx.get(docRef).then(snap=>{
+    let remote = {};
+    if(snap.exists && snap.data().data){ try{ remote = JSON.parse(snap.data().data); }catch(e){ remote = {}; } }
+    const base = baseJson ? JSON.parse(baseJson) : null;
+    mergedObj = base ? mergeData(base, sentLocal, remote) : Object.assign({}, unionPreferRemote(sentLocal, remote), pickView(sentLocal));
+    payload = JSON.stringify(mergedObj);
     lastWrittenDataJson = payload;
-    fbDb.collection('users').doc(currentUID).set({
-      data: payload,
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    }).then(()=>{
+    tx.set(docRef, { data: payload, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+  }));
+  Promise.race([work, timeout]).then(()=>{
+    clearTimeout(tmo);
+    saveInFlight = false; retryDelay = 4000;
+    storeBase(payload);
+    // fold anything new from the other device into what's on screen, keeping any edits made while saving
+    const nowLocal = JSON.parse(JSON.stringify(DATA));
+    if(!jeq(mergedObj, nowLocal)){
+      const final = mergeData(sentLocal, nowLocal, mergedObj);
+      if(!jeq(final, nowLocal)) adoptData(final);
+    }
+    if(saveAgain || hasUnsavedChanges(payload)){
+      hasPendingLocalSave = true; setTimeout(doCloudSave, 300);
+    } else {
       hasPendingLocalSave = false;
       setSyncStatus('synced', 'Synced across your devices');
-      if(discardStalePendingRemoteFn) discardStalePendingRemoteFn();
-    }).catch(err=>{
-      hasPendingLocalSave = false;
-      console.error('Cloud save failed', err);
-      setSyncStatus('offline', 'Saved on this device, will sync when back online');
-    });
-  }, 900);
+    }
+    if(payload.length > 900000) setSyncStatus('offline','Your data is getting very large, tell Claude before it stops saving');
+  }).catch(err=>{
+    clearTimeout(tmo);
+    saveInFlight = false;
+    console.error('Cloud save failed', err);
+    setSyncStatus('offline', 'NOT saved to the cloud yet, saved on this device, retrying...');
+    retryTimer = setTimeout(doCloudSave, retryDelay);
+    retryDelay = Math.min(retryDelay*2, 60000);
+  });
 }
+function hasUnsavedChanges(payload){
+  // true if DATA differs from what was just written, ignoring the per-device view fields
+  const a = JSON.parse(JSON.stringify(DATA)), b = JSON.parse(payload);
+  VIEW_KEYS.forEach(k=>{ delete a[k]; delete b[k]; });
+  return !jeq(a,b);
+}
+
+// Put merged data on screen + in local storage (never triggers a cloud save by itself)
+function adoptData(obj){
+  applyingRemoteUpdate = true;
+  try{
+    normalizeLoaded(obj);
+    try{ localStorage.setItem(STORE_KEY, JSON.stringify(DATA)); }catch(e){}
+    if(isTypingInField()){ renderDeferred = true; }
+    else { renderDeferred = false; renderActivePage(); }
+  }finally{ applyingRemoteUpdate = false; }
+}
+
+// Bring in whatever the cloud has now and merge it with this device's data.
+function ingestRemote(rawJson){
+  let remote;
+  try{ remote = JSON.parse(rawJson); }catch(e){ return; }
+  const local = JSON.parse(JSON.stringify(DATA));
+  const base = baseJson ? JSON.parse(baseJson) : null;
+  const merged = base ? mergeData(base, local, remote) : Object.assign({}, unionPreferRemote(local, remote), pickView(local));
+  storeBase(rawJson);
+  if(!jeq(merged, local)){
+    adoptData(merged);
+    setSyncStatus(hasPendingLocalSave ? 'syncing' : 'synced', hasPendingLocalSave ? 'Saving...' : 'Updated from another device');
+  }
+  if(hasUnsavedChanges(rawJson) && !saveInFlight){ queueCloudSave(); }
+}
+function pickView(o){ const v={}; VIEW_KEYS.forEach(k=>{ if(o[k]!==undefined) v[k]=o[k]; }); return v; }
 
 function startCloudSync(uid){
   currentUID = uid;
   const docRef = fbDb.collection('users').doc(uid);
-  let firstSnapshotHandled = false;
-  // (pendingRemoteData is declared once, shared, near the top of the script)
+  baseJson = loadBase();
 
   function applyResetToToday(){
-    const todayISO = toISO(new Date());
-    DATA.selectedDate = todayISO;
+    DATA.selectedDate = toISO(new Date());
     const d = new Date();
     DATA.calViewYear = d.getFullYear();
     DATA.calViewMonth = d.getMonth();
   }
+  document.addEventListener('focusout', ()=>{
+    setTimeout(()=>{ if(renderDeferred && !isTypingInField()){ renderDeferred=false; renderActivePage(); } }, 50);
+  });
 
-  function isActivelyTyping(){
-    const active = document.activeElement;
-    // Covers text/number inputs, textareas, AND selects/buttons — any element she could be
-    // mid-interaction with (e.g. the ingredient-picker dropdown, a +/- intake button), not
-    // just text fields. Applying a remote update mid-interaction with any of these is what
-    // was causing the intake counter to revert and the ingredient panel to close.
-    return !!(active && (active.tagName==='INPUT' || active.tagName==='TEXTAREA' || active.tagName==='SELECT' || active.tagName==='BUTTON') && active.closest('#main-app'));
+  // Ask the cloud directly (not a stale cached copy) and merge.
+  function pullFromCloud(){
+    if(!cloudSyncReady) return Promise.resolve();
+    return docRef.get({source:'server'}).then(snap=>{
+      if(snap.exists && snap.data().data) ingestRemote(snap.data().data);
+    }).catch(()=>{ /* offline right now; the next check will catch up */ });
   }
-
-  function applyRemoteData(rawJson, isFirst){
-    try{
-      const remote = JSON.parse(rawJson);
-      applyingRemoteUpdate = true;
-      DATA = Object.assign(JSON.parse(JSON.stringify(DEFAULT_DATA)), remote);
-      migrateFavMeals(); migrateMealsToArrays(); migrateAdhocDaily(); migrateTodoDump(); migrateIngredientsAndMasterList();
-      seedHolidaysIfNeeded(); seedStockItemsIfNeeded(); seedSpeakLifeTasksIfNeeded();
-      if(isFirst) applyResetToToday();
-      localStorage.setItem(STORE_KEY, JSON.stringify(DATA));
-      renderActivePage();
-      setSyncStatus('synced', 'Updated from another device');
-    }catch(e){
-      console.error('Could not apply remote update', e);
-      setSyncStatus('offline', 'Had trouble applying an update, your changes are still safe');
-    }finally{
-      applyingRemoteUpdate = false;
-      firstSnapshotHandled = true;
-    }
+  // iPad/phone apps get frozen when you switch away; the live connection can quietly die.
+  // So whenever the app comes back to the front (or the network returns), re-check the cloud
+  // and push any edits that never made it.
+  function wake(){
+    if(document.visibilityState && document.visibilityState!=='visible') return;
+    pullFromCloud().then(()=>{ if(hasPendingLocalSave && !saveInFlight) doCloudSave(); });
   }
+  document.addEventListener('visibilitychange', wake);
+  window.addEventListener('online', wake);
+  window.addEventListener('focus', wake);
+  setInterval(()=>{ if(!document.visibilityState || document.visibilityState==='visible') pullFromCloud(); }, 60000);
 
-  // If a remote update arrives while she's mid-edit, we hold it here instead of
-  // applying it, and pick it back up once she's done (see the focusout listener
-  // below). This is what actually protects in-progress interaction, deferring the
-  // whole update, not just the screen redraw.
-  function tryApplyPendingRemote(){
-    if(!pendingRemoteData || isActivelyTyping()) return;
-    if(hasPendingLocalSave){
-      // Her own edit hasn't finished saving to the cloud yet, so this held-back
-      // update is definitely stale relative to what she's about to push. Drop
-      // it rather than apply it; her own save reconciles everything correctly
-      // once it lands.
-      pendingRemoteData = null;
-      return;
-    }
-    const data = pendingRemoteData;
-    pendingRemoteData = null;
-    applyRemoteData(data, false);
-  }
-  tryApplyPendingRemoteFn = tryApplyPendingRemote;
-  document.addEventListener('focusout', tryApplyPendingRemote);
-
-  function discardStalePendingRemote(){
-    // Called right when OUR OWN save finishes landing. Whatever the server's state was
-    // WHILE that save was still in flight (the only reason anything would be sitting in
-    // pendingRemoteData right now) is necessarily older than what we just wrote. Applying
-    // it here would silently revert the change we just made — that's exactly what was
-    // reopening the dashboard on the wrong date after sign-in, and what made "Clear" on
-    // the Grocery List look like it hadn't removed anything. Just drop it.
-    pendingRemoteData = null;
-  }
-  discardStalePendingRemoteFn = discardStalePendingRemote;
-
-  docRef.get().then(snap=>{
+  docRef.get({source:'server'}).catch(()=>docRef.get()).then(snap=>{
     if(snap.exists && snap.data().data){
       try{
         const remote = JSON.parse(snap.data().data);
-        DATA = Object.assign(JSON.parse(JSON.stringify(DEFAULT_DATA)), remote);
-        migrateFavMeals(); migrateMealsToArrays(); migrateAdhocDaily(); migrateTodoDump(); migrateIngredientsAndMasterList();
-        seedHolidaysIfNeeded(); seedStockItemsIfNeeded(); seedSpeakLifeTasksIfNeeded();
+        const local = JSON.parse(JSON.stringify(DATA));
+        const base = baseJson ? JSON.parse(baseJson) : null;
+        // Edits made on this device that never reached the cloud are merged in, not thrown away.
+        const merged = base ? mergeData(base, local, remote) : unionPreferRemote(local, remote);
+        normalizeLoaded(merged);
+        storeBase(snap.data().data);
+        try{ localStorage.setItem(STORE_KEY, JSON.stringify(DATA)); }catch(e){}
       }catch(e){ console.error('Could not parse cloud data', e); }
-    } else {
-      // first time this account has synced: push whatever is already on this device up
-      docRef.set({ data: JSON.stringify(DATA), updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
     }
     applyResetToToday();
     cloudSyncReady = true;
@@ -1318,33 +1419,15 @@ function startCloudSync(uid){
     document.getElementById('auth-screen').style.display = 'none';
     document.getElementById('main-app').style.display = 'flex';
     renderActivePage();
-    setSyncStatus('synced', 'Synced across your devices');
-    // Persist the corrected date right away so the listener below (which delivers
-    // the current server state the moment it attaches) doesn't silently revert it.
-    queueCloudSave();
+    setSyncStatus('syncing', 'Saving...');
+    hasPendingLocalSave = true;
+    doCloudSave(); // pushes this device's merged copy (also creates the cloud copy the first time)
 
-    // Listen for changes from other devices
-    docRef.onSnapshot(snap=>{
-      if(!snap.exists) return;
-      if(snap.metadata.hasPendingWrites) return; // this is our own write echoing back, ignore
-      const rawJson = snap.data().data;
-      if(rawJson === lastWrittenDataJson){
-        // This is the server's confirmation of a write THIS device already made — the content
-        // is identical, only the serverTimestamp field resolved, which fires a second snapshot
-        // event even though nothing meaningful changed. Treating this as a "real" remote update
-        // was the root cause of the intake counter reverting and the ingredient panel closing
-        // itself: it would reapply slightly-stale data over whatever she'd just done next.
-        return;
-      }
-      if(isActivelyTyping() || hasPendingLocalSave){
-        // Hold this update instead of applying it, don't touch DATA at all while she's
-        // mid-edit (any input/select/button) or while our own save is still in flight,
-        // so nothing she just did can get silently overwritten. Picked back up by
-        // tryApplyPendingRemoteFn (once our save settles) or on focusout.
-        pendingRemoteData = rawJson;
-        return;
-      }
-      applyRemoteData(rawJson, !firstSnapshotHandled);
+    docRef.onSnapshot(s=>{
+      if(!s.exists || s.metadata.hasPendingWrites || s.metadata.fromCache) return;
+      const raw = s.data().data;
+      if(raw === lastWrittenDataJson) return; // our own write coming back
+      ingestRemote(raw);
     });
   }).catch(err=>{
     console.error('Initial cloud load failed', err);
@@ -1355,6 +1438,8 @@ function startCloudSync(uid){
     cloudSyncReady = true;
     applyResetToToday();
     renderActivePage();
+    hasPendingLocalSave = true;
+    retryTimer = setTimeout(()=>{ pullFromCloud().then(doCloudSave); }, 5000);
   });
 }
 
